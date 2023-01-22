@@ -6,6 +6,7 @@ import (
 
     "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+    "github.com/charmbracelet/lipgloss"
 	kp "github.com/Zaphoood/tresor/lib/keepass"
 )
 
@@ -23,8 +24,16 @@ type model struct {
     err     error
 
     focusIndex int
-    inputs []textinput.Model
+    inputs     []textinput.Model
+
+    winWidth  int
+    winHeight int
 }
+
+var boxStyle = lipgloss.NewStyle().
+    Width(50).
+    Padding(1, 2, 1).
+    BorderStyle(lipgloss.NormalBorder())
 
 func NewModel() model {
     m := model{
@@ -43,7 +52,7 @@ func NewModel() model {
        case 1:
            input.Placeholder = "Password"
            input.EchoMode = textinput.EchoPassword
-           //input.EchoCharacter = "*"
+           input.EchoCharacter = '•'
        }
        m.inputs[i] = input
    }
@@ -56,6 +65,9 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
+    case tea.WindowSizeMsg:
+        m.winWidth = msg.Width
+        m.winHeight = msg.Height
     case doneMsg:
         m.status = Done
         m.content = msg.content
@@ -140,16 +152,20 @@ func (m model) View() string {
         }
         builder.WriteString("\n(Press 'Ctrl-c' to quit)")
 
-        return builder.String()
+        return m.centerInWindow(boxStyle.Render(builder.String()))
     case Loading:
-        return "Loading..."
+        return m.centerInWindow(boxStyle.Render("Loading..."))
     case Done:
-        return fmt.Sprintf("Done\n%s", m.content)
+        return m.centerInWindow(boxStyle.Render(fmt.Sprintf("Done\n%s", m.content)))
     case Failed:
-        return "Error: " + m.err.Error()
+        return m.centerInWindow(boxStyle.Render("Error: " + m.err.Error()))
     default:
-        return "Invalid status: " + fmt.Sprintf("%d", m.status)
+        return m.centerInWindow(boxStyle.Render("Invalid status: " + fmt.Sprintf("%d", m.status)))
     }
+}
+
+func (m model) centerInWindow(text string) string {
+    return lipgloss.Place(m.winWidth, m.winHeight, lipgloss.Center, lipgloss.Center, text)
 }
 
 func openDatabase(path string) tea.Cmd {
