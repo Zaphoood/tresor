@@ -13,5 +13,5 @@ func LoadDB(path string) (string, error) {
     if (rand.Int() % 2) == 1 {
         return "", errors.New(fmt.Sprintf("Failed to load DB at %s", path))
     }
-    return fmt.Sprintf("Content of %s:\nnuser=johndoe\npassword=foobar", path), nil
+    return fmt.Sprintf("Content of %s:\nuser=johndoe\npassword=foobar", path), nil
 }
