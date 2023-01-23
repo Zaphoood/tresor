@@ -64,11 +64,12 @@ func (m Navigate) View() string {
 
 func (m *Navigate) loadDatabase() tea.Cmd {
     return func() tea.Msg {
-        content, err := kp.LoadDB(m.path)
+        db := kp.NewDatabase(m.path, m.password)
+        err := db.Load()
         if err != nil {
             return errMsg{err}
         }
-        return doneMsg{content}
+        return doneMsg{db.Content()}
     }
 }
 

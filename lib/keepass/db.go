@@ -1,18 +1,33 @@
 package keepass
 
 import (
-    "fmt"
-    "time"
-    "math/rand"
     "errors"
+    "fmt"
+    "os"
 )
 
-func LoadDB(path string) (string, error) {
-    // Mock database loading -- act like it failed 50% of the time
-    time.Sleep(500 * time.Millisecond)
-    rand.Seed(time.Now().UnixNano())
-    if (rand.Int() % 2) == 1 {
-        return "", errors.New(fmt.Sprintf("Failed to load DB %s", path))
+type database struct {
+    path     string
+    password string
+    content  string
+}
+
+func NewDatabase(path, password string) database {
+    return database{path, password, ""}
+}
+
+func (d database) Content() string {
+    return d.content
+}
+
+func (d *database) Load() error {
+    // Check if file exists
+    _, err := os.Stat(d.path)
+    if err != nil {
+        if os.IsNotExist(err) {
+            return errors.New(fmt.Sprintf("File %s does not exist", d.path))
+        }
     }
-    return fmt.Sprintf("Content of database %s:\nuser=johndoe\npassword=foobar", path), nil
+    d.content = "Hello :)"
+    return nil
 }
