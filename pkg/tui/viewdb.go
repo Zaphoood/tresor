@@ -13,6 +13,7 @@ type Navigate struct {
     status loadingStatus
     path     string
     password string
+    err      error
 }
 
 type loadingStatus int
@@ -24,7 +25,7 @@ const (
 )
 
 func NewNavigate(path, password string) Navigate {
-    return Navigate{Loading, path, password}
+    return Navigate{Loading, path, password, nil}
 }
 
 func (m Navigate) Init() tea.Cmd {
@@ -37,6 +38,7 @@ func (m Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.status = Finished
     case errMsg:
         m.status = Failed
+        m.err = msg.err
     case tea.KeyMsg:
         if msg.String() == "ctrl+c" {
             return m, tea.Quit
@@ -55,7 +57,7 @@ func (m Navigate) View() string {
         b.WriteString(fmt.Sprintf("path=%s\n", m.path))
         b.WriteString(fmt.Sprintf("password=%s\n", m.password))
     case Failed:
-        b.WriteString("Something went wrong... :(")
+        b.WriteString(fmt.Sprintf("Error: %s", m.err.Error()))
     default:
         b.WriteString("Oops")
     }
@@ -64,8 +66,8 @@ func (m Navigate) View() string {
 
 func (m *Navigate) loadDatabase() tea.Cmd {
     return func() tea.Msg {
-        db := kp.NewDatabase(m.path, m.password)
-        err := db.Load()
+        db := kp.NewDatabase(m.path)
+        err := db.Load(m.password)
         if err != nil {
             return errMsg{err}
         }
