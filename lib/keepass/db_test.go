@@ -1,7 +1,7 @@
 package keepass
 
 import (
-    "log"
+    //"log"
     "fmt"
     //"strings"
     "testing"
@@ -25,6 +25,13 @@ func TestLoadDb(t *testing.T) {
     if err != nil {
         t.Fatal(err)
     }
+
+    expectedMajor := uint16(3)
+    expectedMinor := uint16(1)
+    if major, minor := d.Version(); major != expectedMajor || minor != expectedMinor {
+      t.Errorf("Want version to be %d.%d but got %d.%d", expectedMajor, expectedMinor, major, minor)
+    }
+
     //if !strings.HasPrefix(d.Content(), XML_HEADER) {
     //    t.Error(fmt.Sprintf("Missing XML header, got:\n%s", d.Content()))
     //}

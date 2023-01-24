@@ -3,9 +3,14 @@ package keepass
 import (
     "bytes"
     "errors"
+    "encoding/binary"
     "fmt"
     "log"
     "os"
+)
+
+const (
+    VERSION_NUMBER_LEN  = 2
 )
 
 var (
@@ -16,6 +21,8 @@ var (
 type database struct {
     path     string
     content  string
+    verMajor uint16
+    verMinor uint16
 }
 
 type IRSID int
@@ -31,11 +38,16 @@ type headers struct {
 }
 
 func NewDatabase(path string) database {
-    return database{path, ""}
+    return database{path, "", 0, 0}
 }
 
 func (d database) Content() string {
     return d.content
+}
+
+// Return kdbx version as tuple (major, minor)
+func (d database) Version() (uint16, uint16) {
+    return d.verMajor, d.verMinor
 }
 
 func (d *database) Load(password string) error {
@@ -57,6 +69,7 @@ func (d *database) Load(password string) error {
 func (d *database) parse() error {
     log.Println("Parsing database")
     f, err := os.Open(d.path)
+    defer f.Close()
     if err != nil { return err }
 
     // Check filetype signature
@@ -74,6 +87,21 @@ func (d *database) parse() error {
     }
 
     // Read kdbx version
+    bufMinor := make([]byte, VERSION_NUMBER_LEN)
+    bufMajor := make([]byte, VERSION_NUMBER_LEN)
+    read, err := f.Read(bufMinor)
+    if err != nil { return err }
+    if read != len(bufMinor) {
+        return errors.New("File truncated")
+    }
+    read, err = f.Read(bufMajor)
+    if err != nil { return err }
+    if read != len(bufMajor) {
+        return errors.New("File truncated")
+    }
+    d.verMinor = binary.LittleEndian.Uint16(bufMinor)
+    d.verMajor = binary.LittleEndian.Uint16(bufMajor)
+    log.Printf("Version is %d.%d", d.verMajor, d.verMinor)
 
     // Read headers
 
