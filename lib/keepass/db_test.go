@@ -1,9 +1,7 @@
 package keepass
 
 import (
-    //"log"
     "fmt"
-    //"strings"
     "testing"
 )
 
@@ -35,6 +33,14 @@ func TestLoadDb(t *testing.T) {
     //if !strings.HasPrefix(d.Content(), XML_HEADER) {
     //    t.Error(fmt.Sprintf("Missing XML header, got:\n%s", d.Content()))
     //}
+    fmt.Println("Headers:")
+    fmt.Printf("masterSeed: %x\n", d.headers.masterSeed)
+    fmt.Printf("transformSeed: %x\n", d.headers.transformSeed)
+    fmt.Printf("transformRounds: %d\n", d.headers.transformRounds)
+    fmt.Printf("encryptionIV: %x\n", d.headers.encryptionIV)
+    fmt.Printf("protectedStreamKey: %x\n", d.headers.protectedStreamKey)
+    fmt.Printf("streamStartBytes: %x\n", d.headers.streamStartBytes)
+    fmt.Printf("irs: %d\n", d.headers.irs)
     fmt.Printf("Content:\n%s", d.Content())
 }
 
@@ -51,5 +57,22 @@ func TestInvalidVersionSignature(t *testing.T) {
     err := d.Load("password")
     if err == nil {
         t.Fatal("Want error for file with invalid version signature, got nil")
+    }
+}
+
+func TestInvalidCipherID(t *testing.T) {
+    d := NewDatabase("../../example/example_invalid_cipher_id.kdbx")
+    err := d.Load("password")
+    if err == nil {
+        t.Fatal("Want error for file with invalid cipher id, got nil")
+    }
+}
+
+func TestCompressed(t *testing.T) {
+    // Compression is not implemented yet, so we want to return an error for compressed databases
+    d := NewDatabase("../../example/example_compressed.kdbx")
+    err := d.Load("password")
+    if err == nil {
+        t.Fatal("Want error for compressed database, got nil")
     }
 }

@@ -28,7 +28,7 @@ const (
     EncryptionIV
     ProtectedStreamKey
     StreamStartBytes
-    InnerRandomstreamID
+    InnerRandomStreamID
     // Store number of header codes so that we can iterate
     NUM_HEADER_CODES
 )
@@ -43,28 +43,37 @@ var obligatoryHeaders [9]headerCode = [9]headerCode{
     EncryptionIV,
     ProtectedStreamKey,
     StreamStartBytes,
-    InnerRandomstreamID,
+    InnerRandomStreamID,
 }
 
 func validHeaderCode(c headerCode) bool {
-    return EOH <= c && c <= InnerRandomstreamID
+    return EOH <= c && c < NUM_HEADER_CODES
 }
 
 var (
-    FILE_SIGNATURE    [4]byte = [4]byte{ 0x03, 0xD9, 0xA2, 0x9A }
-    VERSION_SIGNATURE [4]byte = [4]byte{ 0x67, 0xFB, 0x4B, 0xB5 }
+    FILE_SIGNATURE     [4]byte =  [4]byte{ 0x03, 0xD9, 0xA2, 0x9A }
+    VERSION_SIGNATURE  [4]byte =  [4]byte{ 0x67, 0xFB, 0x4B, 0xB5 }
+    AES_CIPHER_ID     [16]byte = [16]byte{ 0x31, 0xC1, 0xF2, 0xE6, 0xBF, 0x71, 0x43, 0x50, 0xBE, 0x58, 0x05, 0x21, 0x6A, 0xFC, 0x5A, 0xFF }
 )
 
-type database struct {
-    path     string
-    content  string
-    verMajor uint16
-    verMinor uint16
-}
+const (
+    COMPRESSION_None = 0
+    COMPRESSION_GZip = 1
+)
 
 type IRSID int
 
-type headers struct {
+const (
+    IRS_None = iota
+    IRS_ARC4
+    IRS_Salsa20
+)
+
+func validIRSID(id uint32) bool {
+    return IRS_None <= id && id <= IRS_Salsa20
+}
+
+type databaseHeaders struct {
     masterSeed         []byte
     transformSeed      []byte
     transformRounds    uint64
@@ -74,8 +83,16 @@ type headers struct {
     irs                IRSID
 }
 
+type database struct {
+    path     string
+    content  string
+    verMajor uint16
+    verMinor uint16
+    headers  databaseHeaders
+}
+
 func NewDatabase(path string) database {
-    return database{path, "", 0, 0}
+    return database{path, "", 0, 0, databaseHeaders{}}
 }
 
 func (d database) Content() string {
@@ -179,6 +196,27 @@ func (d *database) parse() error {
             return fmt.Errorf("Missing header with code %d", h)
         }
     }
+
+    if !bytes.Equal(headerMap[CipherID], AES_CIPHER_ID[:]) {
+        return errors.New("Invalid or unsupported cipher")
+    }
+
+    if binary.LittleEndian.Uint32(headerMap[CompressionFlag]) != COMPRESSION_None {
+        return errors.New("Gzip-compressed databases are not supported yet, sorry :(")
+    }
+
+    d.headers.masterSeed         = headerMap[MasterSeed]
+    d.headers.transformSeed      = headerMap[TransformSeed]
+    d.headers.transformRounds    = binary.LittleEndian.Uint64(headerMap[TransformRounds])
+    d.headers.encryptionIV       = headerMap[EncryptionIV]
+    d.headers.protectedStreamKey = headerMap[ProtectedStreamKey]
+    d.headers.streamStartBytes   = headerMap[StreamStartBytes]
+
+    irsid := binary.LittleEndian.Uint32(headerMap[InnerRandomStreamID])
+    if !validIRSID(irsid) {
+        return fmt.Errorf("Invalid Inner Random Stream ID: %d", irsid)
+    }
+    d.headers.irs = IRSID(irsid)
 
     // Read remaining file content
 
