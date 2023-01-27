@@ -1,9 +1,6 @@
 package keepass
 
-import (
-    "fmt"
-    "testing"
-)
+import "testing"
 
 const (
     XML_HEADER = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>"
@@ -33,15 +30,6 @@ func TestLoadDb(t *testing.T) {
     //if !strings.HasPrefix(d.Content(), XML_HEADER) {
     //    t.Error(fmt.Sprintf("Missing XML header, got:\n%s", d.Content()))
     //}
-    fmt.Println("Headers:")
-    fmt.Printf("masterSeed: %x\n", d.headers.masterSeed)
-    fmt.Printf("transformSeed: %x\n", d.headers.transformSeed)
-    fmt.Printf("transformRounds: %d\n", d.headers.transformRounds)
-    fmt.Printf("encryptionIV: %x\n", d.headers.encryptionIV)
-    fmt.Printf("protectedStreamKey: %x\n", d.headers.protectedStreamKey)
-    fmt.Printf("streamStartBytes: %x\n", d.headers.streamStartBytes)
-    fmt.Printf("irs: %d\n", d.headers.irs)
-    fmt.Printf("Content:\n%s", d.Content())
 }
 
 func TestInvalidFileSignature(t *testing.T) {

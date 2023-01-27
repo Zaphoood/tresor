@@ -94,7 +94,14 @@ type database struct {
 }
 
 func NewDatabase(path string) database {
-    return database{path, "", make([]byte, 0), 0, 0, databaseHeaders{}}
+    return database{
+        path: path,
+        content: "",
+        content_encrypted: make([]byte, 0),
+        verMajor: 0,
+        verMinor: 0,
+        headers: databaseHeaders{},
+    }
 }
 
 func (d database) Content() string {
@@ -123,7 +130,6 @@ func (d *database) Load(password string) error {
 }
 
 func (d *database) parse() error {
-    log.Println("Parsing database")
     f, err := os.Open(d.path)
     defer f.Close()
     if err != nil { return err }
@@ -157,7 +163,6 @@ func (d *database) parse() error {
     }
     d.verMinor = binary.LittleEndian.Uint16(bufMinor)
     d.verMajor = binary.LittleEndian.Uint16(bufMajor)
-    log.Printf("Version is %d.%d", d.verMajor, d.verMinor)
 
     // Read headers
     headerMap := make(map[headerCode][]byte)
@@ -225,9 +230,6 @@ func (d *database) parse() error {
     if err != nil {
         return fmt.Errorf("Error while reading database content: %s", err)
     }
-    fmt.Printf("Read %d bytes of content:\n", len(d.content_encrypted))
-    fmt.Printf("%x ... %x\n", d.content_encrypted[:50], d.content_encrypted[len(d.content_encrypted)-50:])
-
 
     return nil
 }
