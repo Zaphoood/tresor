@@ -5,6 +5,7 @@ import (
     "errors"
     "encoding/binary"
     "fmt"
+    "io/ioutil"
     "log"
     "os"
 )
@@ -84,15 +85,16 @@ type databaseHeaders struct {
 }
 
 type database struct {
-    path     string
-    content  string
-    verMajor uint16
-    verMinor uint16
-    headers  databaseHeaders
+    path              string
+    content           string
+    content_encrypted []byte
+    verMajor          uint16
+    verMinor          uint16
+    headers           databaseHeaders
 }
 
 func NewDatabase(path string) database {
-    return database{path, "", 0, 0, databaseHeaders{}}
+    return database{path, "", make([]byte, 0), 0, 0, databaseHeaders{}}
 }
 
 func (d database) Content() string {
@@ -219,6 +221,12 @@ func (d *database) parse() error {
     d.headers.irs = IRSID(irsid)
 
     // Read remaining file content
+    d.content_encrypted, err = ioutil.ReadAll(f)
+    if err != nil {
+        return fmt.Errorf("Error while reading database content: %s", err)
+    }
+    fmt.Printf("Read %d bytes of content:\n", len(d.content_encrypted))
+    fmt.Printf("%x ... %x\n", d.content_encrypted[:50], d.content_encrypted[len(d.content_encrypted)-50:])
 
 
     return nil
