@@ -2,23 +2,22 @@ package main
 
 import (
 	"fmt"
-	"os"
+	"github.com/Zaphoood/tresor/pkg/tui"
 	tea "github.com/charmbracelet/bubbletea"
-    "github.com/Zaphoood/tresor/pkg/tui"
+	"os"
 )
 
-
 func main() {
-    f, err := tea.LogToFile("debug.log", "debug")
+	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
 		fmt.Println("fatal:", err)
 		os.Exit(1)
 	}
 	defer f.Close()
 
-    p := tea.NewProgram(tui.NewMainModel(), tea.WithAltScreen())
-    if _, err := p.Run(); err != nil {
-        fmt.Printf("Error: %s", err)
-        os.Exit(1)
-    }
+	p := tea.NewProgram(tui.NewMainModel(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error: %s", err)
+		os.Exit(1)
+	}
 }

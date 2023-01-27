@@ -5,12 +5,12 @@ import (
 )
 
 func openDatabaseCmd(path, password string) tea.Cmd {
-    return func() tea.Msg {
-        return openDatabaseMsg{path, password}
-    }
+	return func() tea.Msg {
+		return openDatabaseMsg{path, password}
+	}
 }
 
 type openDatabaseMsg struct {
-    path     string
-    password string
+	path     string
+	password string
 }
