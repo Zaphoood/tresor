@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"strings"
 
+	kp "github.com/Zaphoood/tresor/lib/keepass"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	kp "github.com/Zaphoood/tresor/lib/keepass"
 )
 
 type Decrypt struct {
 	focusIndex int
 	input      textinput.Model
-	err       error
+	err        error
 
 	windowWidth  int
 	windowHeight int
@@ -22,9 +22,9 @@ type Decrypt struct {
 
 func NewDecrypt(database *kp.Database, windowWidth, windowHeight int) Decrypt {
 	m := Decrypt{
-		input: textinput.New(),
-		database: database,
-		windowWidth: windowWidth,
+		input:        textinput.New(),
+		database:     database,
+		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
 	}
 

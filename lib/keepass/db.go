@@ -2,18 +2,24 @@ package keepass
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 )
 
 const (
 	VERSION_NUMBER_LEN = 2
 	TLV_TYPE_LEN       = 1
 	TLV_LENGTH_LEN     = 2
+	BLOCK_HASH_LEN     = 32
+	DWORD_LEN          = 4
 )
 
 type headerCode uint8
@@ -85,32 +91,31 @@ type databaseHeaders struct {
 	irs                IRSID
 }
 
+type block struct {
+	start  int
+	length int
+}
+
 type Database struct {
-	path              string
-	content           string
-	content_encrypted []byte
-	verMajor          uint16
-	verMinor          uint16
-	headers           databaseHeaders
+	path       string
+	content    []byte
+	ciphertext []byte
+	verMajor   uint16
+	verMinor   uint16
+	headers    databaseHeaders
 }
 
 func NewDatabase(path string) Database {
 	return Database{
-		path:              path,
-		content:           "",
-		content_encrypted: make([]byte, 0),
-		verMajor:          0,
-		verMinor:          0,
-		headers:           databaseHeaders{},
+		path: path,
 	}
 }
-
 
 func (d Database) Path() string {
 	return d.path
 }
 
-func (d Database) Content() string {
+func (d Database) Content() []byte {
 	return d.content
 }
 
@@ -212,7 +217,7 @@ func (d *Database) parse() error {
 			break
 		}
 		if !validHeaderCode(htype) {
-			log.Printf("Skipping unknown header code: %d", htype)
+			log.Printf("WARNING: Skipping invalid header code: %d", htype)
 		}
 		headerMap[htype] = value
 	}
@@ -246,20 +251,102 @@ func (d *Database) parse() error {
 	d.headers.irs = IRSID(irsid)
 
 	// Read remaining file content
-	d.content_encrypted, err = ioutil.ReadAll(f)
+	d.ciphertext, err = ioutil.ReadAll(f)
 	if err != nil {
 		return fmt.Errorf("Error while reading database content: %s", err)
+	}
+
+	if len(d.ciphertext)%aes.BlockSize != 0 {
+		return fmt.Errorf("Invalid cipher text: length must be multiple of block size %d", aes.BlockSize)
 	}
 
 	return nil
 }
 
-// Read len(b) bytes from f and compare with b
-func readCompare(f *os.File, b []byte) (bool, error) {
-	buf := make([]byte, len(b))
-	_, err := f.Read(buf)
+func (d *Database) Decrypt(password string) error {
+	// Generate composite key
+	compositeKey := sha256.Sum256([]byte(password))
+	compositeKey = sha256.Sum256(compositeKey[:])
+
+	// Generate master key
+	cfr, err := aes.NewCipher(d.headers.transformSeed)
 	if err != nil {
-		return false, err
+		return err
 	}
-	return bytes.Equal(buf, b), nil
+	transformOut := make([]byte, len(compositeKey))
+	copy(transformOut, compositeKey[:])
+	for i := uint64(0); i < d.headers.transformRounds; i++ {
+		cfr.Encrypt(transformOut[0:16], transformOut[0:16])
+		cfr.Encrypt(transformOut[16:32], transformOut[16:32])
+	}
+	transformKey := sha256.Sum256(transformOut)
+
+	h := sha256.New()
+	h.Write(d.headers.masterSeed)
+	h.Write(transformKey[:])
+	masterKey := h.Sum(nil)
+
+	// Decrypt content
+	cfr, err = aes.NewCipher(masterKey)
+	if err != nil {
+		return err
+	}
+	plaintext := make([]byte, len(d.ciphertext))
+	mode := cipher.NewCBCDecrypter(cfr, d.headers.encryptionIV)
+	mode.CryptBlocks(plaintext, d.ciphertext)
+
+	// Verify that decrypting was successful
+	if !bytes.Equal(d.headers.streamStartBytes, plaintext[:len(d.headers.streamStartBytes)]) {
+		return errors.New("Wrong password")
+	}
+	plaintext = plaintext[len(d.headers.streamStartBytes):]
+
+	blocks := make(map[uint32]block)
+	hashIndex := 0
+	totalSize := 0
+	i := 0
+	for i < len(plaintext) {
+		// Read block id
+		blockID := binary.LittleEndian.Uint32(plaintext[i : i+DWORD_LEN])
+		i += DWORD_LEN
+		if _, exists := blocks[blockID]; exists {
+			return fmt.Errorf("Duplicate block ID: %d", blockID)
+		}
+		// Store index of hash for later comparison
+		hashIndex = i
+		i += BLOCK_HASH_LEN
+
+		// Read block size
+		blockSize := int(binary.LittleEndian.Uint32(plaintext[i : i+DWORD_LEN]))
+		// Final block has block size 0
+		if blockSize == 0 {
+			break
+		}
+		i += DWORD_LEN
+
+		// Hash and compare
+		hash := sha256.Sum256(plaintext[i : i+blockSize])
+		if !bytes.Equal(hash[:], plaintext[hashIndex:hashIndex+BLOCK_HASH_LEN]) {
+			return errors.New("Block hash does not match. File may be corrupted")
+		}
+		blocks[blockID] = block{start: i, length: blockSize}
+		totalSize += blockSize
+		i += blockSize
+	}
+	// Concatenate blocks by order of their IDs
+	blockIDs := []int{}
+	for id := range blocks {
+		blockIDs = append(blockIDs, int(id))
+	}
+	sort.Ints(blockIDs)
+
+	d.content = make([]byte, totalSize)
+	pos := 0
+	for _, id := range blockIDs {
+		block := blocks[uint32(id)]
+		copy(d.content[pos:pos+block.length], plaintext[block.start:block.start+block.length])
+		pos += block.length
+	}
+
+	return nil
 }

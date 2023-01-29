@@ -1,9 +1,15 @@
 package keepass
 
-import "testing"
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"testing"
+)
 
-const (
-	XML_HEADER = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>"
+var (
+	XML_HEADER      = []byte("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>")
+	KEEPASS_END_TAG = []byte("</KeePassFile>")
 )
 
 func TestFileNotExist(t *testing.T) {
@@ -27,9 +33,18 @@ func TestLoadDb(t *testing.T) {
 		t.Errorf("Want version to be %d.%d but got %d.%d", expectedMajor, expectedMinor, major, minor)
 	}
 
-	//if !strings.HasPrefix(d.Content(), XML_HEADER) {
-	//    t.Error(fmt.Sprintf("Missing XML header, got:\n%s", d.Content()))
-	//}
+	err = d.Decrypt("foo")
+	if err != nil {
+		t.Error(err)
+	}
+
+	content := d.Content()
+	if !bytes.Equal(content[:len(XML_HEADER)], XML_HEADER) {
+		t.Error(fmt.Sprintf("Expected XML header:\n%s\ngot:\n%s", XML_HEADER, content[:len(XML_HEADER)]))
+	}
+	if !bytes.Equal(content[len(content)-len(KEEPASS_END_TAG):], KEEPASS_END_TAG) {
+		t.Error(fmt.Sprintf("Expected end tag to be:\n%s\ngot:\n%s", KEEPASS_END_TAG, content[len(content)-len(KEEPASS_END_TAG):]))
+	}
 }
 
 func TestInvalidFileSignature(t *testing.T) {
@@ -62,5 +77,35 @@ func TestCompressed(t *testing.T) {
 	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for compressed database, got nil")
+	}
+}
+
+func TestInvalidCiphertextLength(t *testing.T) {
+	d := NewDatabase("../../examples/example_invalid_length.kdbx")
+
+	err := d.Load()
+	if err == nil {
+		t.Fatal("Want error for invalid cipher text length, got nil")
+	}
+}
+
+func TestInvalidStreamStartBytes(t *testing.T) {
+	d := NewDatabase("../../examples/example_ssb.kdbx")
+	err := d.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = d.Decrypt("foo")
+	if err == nil {
+		t.Fatal("Want error for invalid stream start bytes, got nil")
+	}
+}
+
+func TestTruncated(t *testing.T) {
+	d := NewDatabase("../../examples/example_truncated.kdbx")
+	err := d.Load()
+	if err != io.EOF {
+		t.Fatal("Want EOF for truncated file, got nil")
 	}
 }

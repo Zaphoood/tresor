@@ -103,4 +103,3 @@ func (m SelectFile) View() string {
 
 	return centerInWindow(boxStyle.Render(builder.String()), m.windowWidth, m.windowHeight)
 }
-

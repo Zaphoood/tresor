@@ -44,6 +44,5 @@ func (m Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Navigate) View() string {
-	return fmt.Sprintf("Navigate:\npath=%s", m.database.Path())
+	return fmt.Sprintf("Navigate %s\n\n%s", m.database.Path(), m.database.Content())
 }
-

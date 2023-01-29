@@ -30,7 +30,10 @@ func fileSelectedCmd(path string) tea.Cmd {
 
 func decryptFileCmd(database *kp.Database, password string) tea.Cmd {
 	return func() tea.Msg {
-		// TODO: Call database.Decrypt(password)
+		err := database.Decrypt(password)
+		if err != nil {
+			return decryptFailedMsg{err}
+		}
 		return decryptDoneMsg{database}
 	}
 }
