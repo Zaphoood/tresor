@@ -8,7 +8,7 @@ const (
 
 func TestFileNotExist(t *testing.T) {
 	d := NewDatabase("/this/path/does/not/exist.kdbx")
-	err := d.Load("password")
+	err := d.Load()
 	if err == nil {
 		t.Error("Want error for non-existent path, got nil")
 	}
@@ -16,7 +16,7 @@ func TestFileNotExist(t *testing.T) {
 
 func TestLoadDb(t *testing.T) {
 	d := NewDatabase("../../examples/example.kdbx")
-	err := d.Load("password")
+	err := d.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestLoadDb(t *testing.T) {
 
 func TestInvalidFileSignature(t *testing.T) {
 	d := NewDatabase("../../examples/example_invalid_file_signature.kdbx")
-	err := d.Load("password")
+	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for file with invalid file signature, got nil")
 	}
@@ -42,7 +42,7 @@ func TestInvalidFileSignature(t *testing.T) {
 
 func TestInvalidVersionSignature(t *testing.T) {
 	d := NewDatabase("../../examples/example_invalid_version_signature.kdbx")
-	err := d.Load("password")
+	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for file with invalid version signature, got nil")
 	}
@@ -50,7 +50,7 @@ func TestInvalidVersionSignature(t *testing.T) {
 
 func TestInvalidCipherID(t *testing.T) {
 	d := NewDatabase("../../examples/example_invalid_cipher_id.kdbx")
-	err := d.Load("password")
+	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for file with invalid cipher id, got nil")
 	}
@@ -59,7 +59,7 @@ func TestInvalidCipherID(t *testing.T) {
 func TestCompressed(t *testing.T) {
 	// Compression is not implemented yet, so we want to return an error for compressed databases
 	d := NewDatabase("../../examples/example_compressed.kdbx")
-	err := d.Load("password")
+	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for compressed database, got nil")
 	}

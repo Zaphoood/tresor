@@ -85,7 +85,7 @@ type databaseHeaders struct {
 	irs                IRSID
 }
 
-type database struct {
+type Database struct {
 	path              string
 	content           string
 	content_encrypted []byte
@@ -94,8 +94,8 @@ type database struct {
 	headers           databaseHeaders
 }
 
-func NewDatabase(path string) database {
-	return database{
+func NewDatabase(path string) Database {
+	return Database{
 		path:              path,
 		content:           "",
 		content_encrypted: make([]byte, 0),
@@ -105,16 +105,21 @@ func NewDatabase(path string) database {
 	}
 }
 
-func (d database) Content() string {
+
+func (d Database) Path() string {
+	return d.path
+}
+
+func (d Database) Content() string {
 	return d.content
 }
 
 // Return kdbx version as tuple (major, minor)
-func (d database) Version() (uint16, uint16) {
+func (d Database) Version() (uint16, uint16) {
 	return d.verMajor, d.verMinor
 }
 
-func (d *database) Load(password string) error {
+func (d *Database) Load() error {
 	// Check if file exists
 	_, err := os.Stat(d.path)
 	if err != nil {
@@ -130,7 +135,7 @@ func (d *database) Load(password string) error {
 	return nil
 }
 
-func (d *database) parse() error {
+func (d *Database) parse() error {
 	f, err := os.Open(d.path)
 	defer f.Close()
 	if err != nil {

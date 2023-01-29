@@ -1,26 +1,32 @@
 package tui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
 	"log"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type viewState int
 
 const (
-	inputView viewState = iota
+	selectFileView viewState = iota
+	decryptView
 	navigateView
 )
 
 type MainModel struct {
 	// Which sub-model we are currently viewing
-	view     viewState
-	input    tea.Model
-	navigate tea.Model
+	view       viewState
+	selectFile tea.Model
+	decrypt    tea.Model
+	navigate   tea.Model
+
+	windowWidth  int
+	windowHeight int
 }
 
 func NewMainModel() MainModel {
-	return MainModel{view: inputView, input: NewInput()}
+	return MainModel{view: selectFileView, selectFile: NewSelectFile()}
 }
 
 func (m MainModel) Init() tea.Cmd {
@@ -32,27 +38,43 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case openDatabaseMsg:
+	case loadDoneMsg:
+		m.view = decryptView
+		m.decrypt = NewDecrypt(msg.database, m.windowWidth, m.windowHeight)
+		cmd = m.decrypt.Init()
+		cmds = append(cmds, cmd)
+	case decryptDoneMsg:
 		m.view = navigateView
-		m.navigate = NewNavigate(msg.path, msg.password)
+		m.navigate = NewNavigate(msg.database, m.windowWidth, m.windowHeight)
 		cmd = m.navigate.Init()
 		cmds = append(cmds, cmd)
+	case globalResizeMsg:
+		m.windowWidth = msg.width
+		m.windowHeight = msg.height
 	}
 
 	switch m.view {
-	case inputView:
-		newInput, newCmd := m.input.Update(msg)
-		newInput, ok := newInput.(Input)
+	case selectFileView:
+		newSelectFile, newCmd := m.selectFile.Update(msg)
+		newSelectFile, ok := newSelectFile.(SelectFile)
 		if !ok {
-			panic("Could not assert that newInput is of type Input after Update()")
+			panic("Could not assert that newSelectFile is of type SelectFile after Update()")
 		}
-		m.input = newInput
+		m.selectFile = newSelectFile
+		cmd = newCmd
+	case decryptView:
+		newDecrypt, newCmd := m.decrypt.Update(msg)
+		newDecrypt, ok := newDecrypt.(Decrypt)
+		if !ok {
+			panic("Could not assert that newDecrypt is of type Decrypt after Update()")
+		}
+		m.decrypt = newDecrypt
 		cmd = newCmd
 	case navigateView:
 		newNavigate, newCmd := m.navigate.Update(msg)
 		newNavigate, ok := newNavigate.(Navigate)
 		if !ok {
-			panic("Could not assert that newNavigate is of type Input after Update()")
+			panic("Could not assert that newNavigate is of type Navigate after Update()")
 		}
 		m.navigate = newNavigate
 		cmd = newCmd
@@ -63,8 +85,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m MainModel) View() string {
 	switch m.view {
-	case inputView:
-		return m.input.View()
+	case selectFileView:
+		return m.selectFile.View()
+	case decryptView:
+		return m.decrypt.View()
 	case navigateView:
 		return m.navigate.View()
 	default:
