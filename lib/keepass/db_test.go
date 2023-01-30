@@ -21,7 +21,7 @@ func TestFileNotExist(t *testing.T) {
 }
 
 func TestLoadDb(t *testing.T) {
-	d := NewDatabase("../../examples/example.kdbx")
+	d := NewDatabase("./test/example.kdbx")
 	err := d.Load()
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestLoadDb(t *testing.T) {
 }
 
 func TestInvalidFileSignature(t *testing.T) {
-	d := NewDatabase("../../examples/example_invalid_file_signature.kdbx")
+	d := NewDatabase("./test/invalid_file_signature.kdbx")
 	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for file with invalid file signature, got nil")
@@ -56,7 +56,7 @@ func TestInvalidFileSignature(t *testing.T) {
 }
 
 func TestInvalidVersionSignature(t *testing.T) {
-	d := NewDatabase("../../examples/example_invalid_version_signature.kdbx")
+	d := NewDatabase("./test/invalid_version_signature.kdbx")
 	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for file with invalid version signature, got nil")
@@ -64,7 +64,7 @@ func TestInvalidVersionSignature(t *testing.T) {
 }
 
 func TestInvalidCipherID(t *testing.T) {
-	d := NewDatabase("../../examples/example_invalid_cipher_id.kdbx")
+	d := NewDatabase("./test/invalid_cipher_id.kdbx")
 	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for file with invalid cipher id, got nil")
@@ -73,7 +73,7 @@ func TestInvalidCipherID(t *testing.T) {
 
 func TestCompressed(t *testing.T) {
 	// Compression is not implemented yet, so we want to return an error for compressed databases
-	d := NewDatabase("../../examples/example_compressed.kdbx")
+	d := NewDatabase("./test/compressed.kdbx")
 	err := d.Load()
 	if err == nil {
 		t.Fatal("Want error for compressed database, got nil")
@@ -81,7 +81,7 @@ func TestCompressed(t *testing.T) {
 }
 
 func TestInvalidCiphertextLength(t *testing.T) {
-	d := NewDatabase("../../examples/example_invalid_length.kdbx")
+	d := NewDatabase("./test/invalid_length.kdbx")
 
 	err := d.Load()
 	if err == nil {
@@ -90,7 +90,7 @@ func TestInvalidCiphertextLength(t *testing.T) {
 }
 
 func TestInvalidStreamStartBytes(t *testing.T) {
-	d := NewDatabase("../../examples/example_ssb.kdbx")
+	d := NewDatabase("./test/invalid_ssb.kdbx")
 	err := d.Load()
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestInvalidStreamStartBytes(t *testing.T) {
 }
 
 func TestTruncated(t *testing.T) {
-	d := NewDatabase("../../examples/example_truncated.kdbx")
+	d := NewDatabase("./test/truncated.kdbx")
 	err := d.Load()
 	if err != io.EOF {
 		t.Fatal("Want EOF for truncated file, got nil")
