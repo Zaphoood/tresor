@@ -98,12 +98,14 @@ type block struct {
 
 type Database struct {
 	path        string
-	content     []byte
-	ciphertext  []byte
 	verMajor    uint16
 	verMinor    uint16
 	headers     databaseHeaders
 	headers_raw []byte // Store entire headers here; verify hash after decrypting
+
+	ciphertext []byte
+	plaintext  []byte
+	parsed     *Parsed
 }
 
 func NewDatabase(path string) Database {
@@ -116,8 +118,8 @@ func (d Database) Path() string {
 	return d.path
 }
 
-func (d Database) Content() []byte {
-	return d.content
+func (d Database) Plaintext() []byte {
+	return d.plaintext
 }
 
 // Return kdbx version as tuple (major, minor)
@@ -134,14 +136,7 @@ func (d *Database) Load() error {
 		}
 		return err
 	}
-	err = d.parse()
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
-func (d *Database) parse() error {
 	f, err := os.Open(d.path)
 	defer f.Close()
 	if err != nil {
@@ -353,12 +348,26 @@ func (d *Database) Decrypt(password string) error {
 	}
 	sort.Ints(blockIDs)
 
-	d.content = make([]byte, totalSize)
+	d.plaintext = make([]byte, totalSize)
 	pos := 0
 	for _, id := range blockIDs {
 		block := blocks[uint32(id)]
-		copy(d.content[pos:pos+block.length], plaintext[block.start:block.start+block.length])
+		copy(d.plaintext[pos:pos+block.length], plaintext[block.start:block.start+block.length])
 		pos += block.length
+	}
+
+	return nil
+}
+
+func (d *Database) Parse() error {
+	var err error
+	d.parsed, err = Parse(d.plaintext)
+	if err != nil {
+		return err
+	}
+	log.Printf("Groups (%d):\n", len(d.parsed.Root.Groups))
+	for _, group := range d.parsed.Root.Groups {
+		log.Printf("  %s\n", group.Name)
 	}
 
 	return nil

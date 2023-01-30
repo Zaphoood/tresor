@@ -38,12 +38,12 @@ func TestLoadDb(t *testing.T) {
 		t.Error(err)
 	}
 
-	content := d.Content()
-	if !bytes.Equal(content[:len(XML_HEADER)], XML_HEADER) {
-		t.Error(fmt.Sprintf("Expected XML header:\n%s\ngot:\n%s", XML_HEADER, content[:len(XML_HEADER)]))
+	plaintext := d.Plaintext()
+	if !bytes.Equal(plaintext[:len(XML_HEADER)], XML_HEADER) {
+		t.Error(fmt.Sprintf("Expected XML header:\n%s\ngot:\n%s", XML_HEADER, plaintext[:len(XML_HEADER)]))
 	}
-	if !bytes.Equal(content[len(content)-len(KEEPASS_END_TAG):], KEEPASS_END_TAG) {
-		t.Error(fmt.Sprintf("Expected end tag to be:\n%s\ngot:\n%s", KEEPASS_END_TAG, content[len(content)-len(KEEPASS_END_TAG):]))
+	if !bytes.Equal(plaintext[len(plaintext)-len(KEEPASS_END_TAG):], KEEPASS_END_TAG) {
+		t.Error(fmt.Sprintf("Expected end tag to be:\n%s\ngot:\n%s", KEEPASS_END_TAG, plaintext[len(plaintext)-len(KEEPASS_END_TAG):]))
 	}
 }
 
