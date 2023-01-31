@@ -97,12 +97,13 @@ type block struct {
 }
 
 type Database struct {
-	path       string
-	content    []byte
-	ciphertext []byte
-	verMajor   uint16
-	verMinor   uint16
-	headers    databaseHeaders
+	path        string
+	content     []byte
+	ciphertext  []byte
+	verMajor    uint16
+	verMinor    uint16
+	headers     databaseHeaders
+	headers_raw []byte // Store entire headers here; verify hash after decrypting
 }
 
 func NewDatabase(path string) Database {
@@ -221,6 +222,18 @@ func (d *Database) parse() error {
 		}
 		headerMap[htype] = value
 	}
+
+	// Store headers for later hashing
+	headersLength, err := f.Seek(0, 1)
+	if err != nil {
+		return err
+	}
+	d.headers_raw = make([]byte, headersLength)
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	f.Read(d.headers_raw)
 
 	// Parse headers
 	for _, h := range obligatoryHeaders {
