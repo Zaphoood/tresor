@@ -154,6 +154,15 @@ type Association struct {
 	KeystrokeSequence string
 }
 
+func (e *Entry) Get(key string) (string, error) {
+	for _, str := range e.Strings {
+		if str.Key == key {
+			return str.Value.Chardata, nil
+		}
+	}
+	return "", fmt.Errorf("No such key: %s", key)
+}
+
 type String struct {
 	XMLName xml.Name `xml:"String"`
 	Key     string

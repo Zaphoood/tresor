@@ -38,11 +38,18 @@ func TestParse(t *testing.T) {
 	for _, group := range parsed.Root.Groups {
 		log.Printf(" * %s\n", group.Name)
 		for _, entry := range group.Entries {
-			log.Printf("   * %s (%d element:s in history)\n", entry.UUID, len(entry.History))
+			title, err := entry.Get("Title")
+			if err != nil {
+				title = "(No title)"
+			}
+			log.Printf("   * %s (UUID: %s, history: %d)\n", title, entry.UUID, len(entry.History))
 			for _, str := range entry.Strings {
 				log.Printf("     * %s (Protected: %t): %s \n",
 					str.Key, str.Value.IsProtected(), str.Value.Chardata)
 			}
+			//for _, str := range entry.Strings {
+			//	log.Printf("     * %s: %s\n", str.Key, str.Value)
+			//}
 		}
 	}
 }
