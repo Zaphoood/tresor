@@ -45,6 +45,19 @@ func TestLoadDb(t *testing.T) {
 	if !bytes.Equal(plaintext[len(plaintext)-len(KEEPASS_END_TAG):], KEEPASS_END_TAG) {
 		t.Error(fmt.Sprintf("Expected end tag to be:\n%s\ngot:\n%s", KEEPASS_END_TAG, plaintext[len(plaintext)-len(KEEPASS_END_TAG):]))
 	}
+
+	err = d.Parse()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	valid, err := d.VerifyHeaderHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !valid {
+		t.Error("Invalid header hash")
+	}
 }
 
 func TestInvalidFileSignature(t *testing.T) {

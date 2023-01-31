@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -371,4 +372,20 @@ func (d *Database) Parse() error {
 	}
 
 	return nil
+}
+
+func (d *Database) VerifyHeaderHash() (bool, error) {
+	if len(d.parsed.Meta.HeaderHash) == 0 {
+		return false, errors.New("No header hash found")
+	}
+	storedHashEnc := []byte(d.parsed.Meta.HeaderHash)
+	storedHash := make([]byte, base64.StdEncoding.DecodedLen(len(storedHashEnc)))
+	_, err := base64.StdEncoding.Decode(storedHash, storedHashEnc)
+	if err != nil {
+		return false, err
+	}
+	actualHash := sha256.Sum256(d.headers_raw)
+	// storedHash may be too long, since its length is taken from base64.StdEncoding.DecodedLen
+	// Therefore we only compare the first len(actualHash) bytes
+	return bytes.Equal(actualHash[:], storedHash[:len(actualHash)]), nil
 }
