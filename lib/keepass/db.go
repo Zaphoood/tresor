@@ -13,6 +13,8 @@ import (
 	"log"
 	"os"
 	"sort"
+
+	"github.com/Zaphoood/tresor/lib/keepass/parser"
 )
 
 const (
@@ -106,7 +108,7 @@ type Database struct {
 
 	ciphertext []byte
 	plaintext  []byte
-	parsed     *Parsed
+	parsed     *parser.Document
 }
 
 func NewDatabase(path string) Database {
@@ -362,7 +364,7 @@ func (d *Database) Decrypt(password string) error {
 
 func (d *Database) Parse() error {
 	var err error
-	d.parsed, err = Parse(d.plaintext)
+	d.parsed, err = parser.Parse(d.plaintext)
 	if err != nil {
 		return err
 	}

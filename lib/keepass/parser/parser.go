@@ -1,59 +1,14 @@
-package keepass
+package parser
 
 import (
 	"encoding/xml"
 	"fmt"
 	"time"
+
+	"github.com/Zaphoood/tresor/lib/keepass/parser/wrappers"
 )
 
-type LiteralBool struct {
-	isSet bool
-	value bool
-}
-
-func (l *LiteralBool) IsSet() bool {
-	return l.isSet
-}
-
-func (l *LiteralBool) Value() bool {
-	return l.value
-}
-
-func (l *LiteralBool) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	l.isSet = false
-	var charData xml.CharData
-	charData = nil
-	end := false
-	for !end {
-		token, err := d.Token()
-		if err != nil {
-			return err
-		}
-		switch t := token.(type) {
-		case xml.CharData:
-			charData = t.Copy()
-		case xml.EndElement:
-			end = true
-		}
-	}
-	if charData == nil {
-		return nil
-	}
-	switch string(charData) {
-	case "True":
-		l.isSet = true
-		l.value = true
-		return nil
-	case "False":
-		l.isSet = true
-		l.value = false
-		return nil
-	default:
-		return fmt.Errorf("Failed to parse element '%s' as literal bool. Want 'True' or 'False', got %s", start.Name.Local, charData)
-	}
-}
-
-type Parsed struct {
+type Document struct {
 	XMLName xml.Name `xml:"KeePassFile"`
 	Meta    Meta
 	Root    Root
@@ -75,7 +30,7 @@ type Meta struct {
 	MasterKeyChangeRec         int
 	MasterKeyChangeForce       int
 	MemoryProtection           MemoryProtection
-	RecycleBinEnabled          LiteralBool
+	RecycleBinEnabled          wrappers.Bool
 	RecycleBinChanged          time.Time
 	EntryTemplatesGroup        string
 	EntryTemplatesGroupChanged time.Time
@@ -89,11 +44,11 @@ type Meta struct {
 
 type MemoryProtection struct {
 	XMLName         xml.Name `xml:"MemoryProtection"`
-	ProtectTitle    LiteralBool
-	ProtectUserName LiteralBool
-	ProtectPassword LiteralBool
-	ProtectURL      LiteralBool
-	ProtectNotes    LiteralBool
+	ProtectTitle    wrappers.Bool
+	ProtectUserName wrappers.Bool
+	ProtectPassword wrappers.Bool
+	ProtectURL      wrappers.Bool
+	ProtectNotes    wrappers.Bool
 }
 
 type Root struct {
@@ -111,7 +66,7 @@ type Group struct {
 	Name       string
 	IconID     int
 	Times      Times
-	IsExpanded LiteralBool
+	IsExpanded wrappers.Bool
 	//DefaultAutoTypeSequence // string?
 	// EnableAutoType // bool?
 	//EnableSearching // bool?
@@ -138,13 +93,13 @@ type Times struct {
 	LastModificationTime time.Time
 	LastAccessTime       time.Time
 	ExpiryTime           time.Time
-	Expires              LiteralBool
+	Expires              wrappers.Bool
 	UsageCount           int
 	LocationChanged      time.Time
 }
 
 type AutoType struct {
-	Enabled                 LiteralBool
+	Enabled                 wrappers.Bool
 	DataTransferObfuscation int
 	Association             Association
 }
@@ -179,8 +134,8 @@ func (v *Value) IsProtected() bool {
 	return v.Protected == "True"
 }
 
-func Parse(b []byte) (*Parsed, error) {
-	p := Parsed{}
+func Parse(b []byte) (*Document, error) {
+	p := Document{}
 	err := xml.Unmarshal(b, &p)
 	if err != nil {
 		return nil, err

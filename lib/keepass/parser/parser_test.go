@@ -1,4 +1,4 @@
-package keepass
+package parser
 
 import (
 	"io/ioutil"
@@ -12,7 +12,7 @@ const (
 )
 
 func TestParse(t *testing.T) {
-	xmlFile, err := os.Open("test/example_decrypted.xml")
+	xmlFile, err := os.Open("../test/example_decrypted.xml")
 	if err != nil {
 		t.Fatal(err)
 	}
