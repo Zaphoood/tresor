@@ -47,9 +47,16 @@ func TestParse(t *testing.T) {
 				log.Printf("     * %s (Protected: %t): %s \n",
 					str.Key, str.Value.IsProtected(), str.Value.Chardata)
 			}
-			//for _, str := range entry.Strings {
-			//	log.Printf("     * %s: %s\n", str.Key, str.Value)
-			//}
 		}
+	}
+
+	path := []int{0, 3, 1}
+	groups, err := parsed.GetPath(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Groups at path %v:\n", path)
+	for _, group := range groups {
+		log.Printf(" * %s", group.Name)
 	}
 }

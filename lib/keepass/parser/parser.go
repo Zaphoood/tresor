@@ -142,3 +142,17 @@ func Parse(b []byte) (*Document, error) {
 	}
 	return &p, nil
 }
+
+// GetPath returns a the subgroups of a group specified by an array of indices. The document is traversed,
+// each level choosing the group with the current index, until the end of the path is reached.
+// An empty path will result in the top-level groups being returned
+func (d *Document) GetPath(path []int) ([]Group, error) {
+	current := &d.Root.Groups
+	for i := 0; i < len(path); i++ {
+		if path[i] >= len(*current) {
+			return []Group{}, fmt.Errorf("Path entry at position %d is out of range: %d >= %d", i, path[i], len(*current))
+		}
+		current = &(*current)[path[i]].Groups
+	}
+	return *current, nil
+}
