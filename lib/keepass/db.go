@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"log"
 	"os"
 	"sort"
+
+	"github.com/Zaphoood/tresor/lib/keepass/parser"
 )
 
 const (
@@ -97,12 +100,15 @@ type block struct {
 }
 
 type Database struct {
-	path       string
-	content    []byte
+	path        string
+	verMajor    uint16
+	verMinor    uint16
+	headers     databaseHeaders
+	headers_raw []byte // Store entire headers here; verify hash after decrypting
+
 	ciphertext []byte
-	verMajor   uint16
-	verMinor   uint16
-	headers    databaseHeaders
+	plaintext  []byte
+	parsed     *parser.Document
 }
 
 func NewDatabase(path string) Database {
@@ -115,8 +121,8 @@ func (d Database) Path() string {
 	return d.path
 }
 
-func (d Database) Content() []byte {
-	return d.content
+func (d Database) Plaintext() []byte {
+	return d.plaintext
 }
 
 // Return kdbx version as tuple (major, minor)
@@ -133,14 +139,7 @@ func (d *Database) Load() error {
 		}
 		return err
 	}
-	err = d.parse()
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
-func (d *Database) parse() error {
 	f, err := os.Open(d.path)
 	defer f.Close()
 	if err != nil {
@@ -221,6 +220,18 @@ func (d *Database) parse() error {
 		}
 		headerMap[htype] = value
 	}
+
+	// Store headers for later hashing
+	headersLength, err := f.Seek(0, 1)
+	if err != nil {
+		return err
+	}
+	d.headers_raw = make([]byte, headersLength)
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	f.Read(d.headers_raw)
 
 	// Parse headers
 	for _, h := range obligatoryHeaders {
@@ -340,13 +351,43 @@ func (d *Database) Decrypt(password string) error {
 	}
 	sort.Ints(blockIDs)
 
-	d.content = make([]byte, totalSize)
+	d.plaintext = make([]byte, totalSize)
 	pos := 0
 	for _, id := range blockIDs {
 		block := blocks[uint32(id)]
-		copy(d.content[pos:pos+block.length], plaintext[block.start:block.start+block.length])
+		copy(d.plaintext[pos:pos+block.length], plaintext[block.start:block.start+block.length])
 		pos += block.length
 	}
 
 	return nil
+}
+
+func (d *Database) Parse() error {
+	var err error
+	d.parsed, err = parser.Parse(d.plaintext)
+	if err != nil {
+		return err
+	}
+	log.Printf("Groups (%d):\n", len(d.parsed.Root.Groups))
+	for _, group := range d.parsed.Root.Groups {
+		log.Printf("  %s\n", group.Name)
+	}
+
+	return nil
+}
+
+func (d *Database) VerifyHeaderHash() (bool, error) {
+	if len(d.parsed.Meta.HeaderHash) == 0 {
+		return false, errors.New("No header hash found")
+	}
+	storedHashEnc := []byte(d.parsed.Meta.HeaderHash)
+	storedHash := make([]byte, base64.StdEncoding.DecodedLen(len(storedHashEnc)))
+	_, err := base64.StdEncoding.Decode(storedHash, storedHashEnc)
+	if err != nil {
+		return false, err
+	}
+	actualHash := sha256.Sum256(d.headers_raw)
+	// storedHash may be too long, since its length is taken from base64.StdEncoding.DecodedLen
+	// Therefore we only compare the first len(actualHash) bytes
+	return bytes.Equal(actualHash[:], storedHash[:len(actualHash)]), nil
 }
