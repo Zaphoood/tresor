@@ -68,6 +68,7 @@ func (m *Navigate) populateAll() {
 			rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 		}
 		m.left.SetRows(rows)
+		m.left.SetCursor(m.path[len(m.path)-1])
 	} else {
 		m.left.SetRows([]table.Row{})
 	}
