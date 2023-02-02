@@ -107,6 +107,22 @@ func (m *Navigate) populateRight() {
 	m.right.SetRows(rows)
 }
 
+func (m *Navigate) moveLeft() {
+	if len(m.path) == 0 {
+		return
+	}
+	m.path = m.path[:len(m.path)-1]
+	m.populateAll()
+}
+
+func (m *Navigate) moveRight() {
+	if len(m.center.Rows()) == 0 {
+		return
+	}
+	m.path = append(m.path, m.center.Cursor())
+	m.populateAll()
+}
+
 func (m Navigate) Init() tea.Cmd {
 	return nil
 }
@@ -122,17 +138,9 @@ func (m Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "l":
-			if len(m.center.Rows()) == 0 {
-				break
-			}
-			m.path = append(m.path, m.center.Cursor())
-			m.populateAll()
+			m.moveRight()
 		case "h":
-			if len(m.path) == 0 {
-				break
-			}
-			m.path = m.path[:len(m.path)-1]
-			m.populateAll()
+			m.moveLeft()
 		}
 	}
 	cursor := m.center.Cursor()
