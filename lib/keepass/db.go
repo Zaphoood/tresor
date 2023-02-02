@@ -125,6 +125,10 @@ func (d Database) Plaintext() []byte {
 	return d.plaintext
 }
 
+func (d Database) Parsed() *parser.Document {
+	return d.parsed
+}
+
 // Return kdbx version as tuple (major, minor)
 func (d Database) Version() (uint16, uint16) {
 	return d.verMajor, d.verMinor
@@ -368,7 +372,6 @@ func (d *Database) Parse() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Groups (%d):\n", len(d.parsed.Root.Groups))
 	for _, group := range d.parsed.Root.Groups {
 		log.Printf("  %s\n", group.Name)
 	}
