@@ -58,30 +58,12 @@ func NewNavigate(database *kp.Database, windowWidth, windowHeight int) Navigate 
 
 func (m *Navigate) populateAll() {
 	if len(m.path) > 0 {
-		groupsLeft, err := m.database.Parsed().GetPath(m.path[:len(m.path)-1])
-		if err != nil {
-			log.Printf("ERROR: %s", err)
-			return
-		}
-		rows := make([]table.Row, len(groupsLeft))
-		for i, group := range groupsLeft {
-			rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
-		}
-		m.left.SetRows(rows)
+		m.populate(&m.left, m.path[:len(m.path)-1])
 		m.left.SetCursor(m.path[len(m.path)-1])
 	} else {
 		m.left.SetRows([]table.Row{})
 	}
-	groupsCenter, err := m.database.Parsed().GetPath(m.path)
-	if err != nil {
-		log.Printf("ERROR: %s", err)
-		return
-	}
-	rows := make([]table.Row, len(groupsCenter))
-	for i, group := range groupsCenter {
-		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
-	}
-	m.center.SetRows(rows)
+	m.populate(&m.center, m.path)
 	m.center.SetCursor(0)
 
 	m.populateRight()
@@ -89,22 +71,25 @@ func (m *Navigate) populateAll() {
 
 func (m *Navigate) populateRight() {
 	cursor := m.center.Cursor()
-	// If a table is empty and the 'down' or 'up' key is pressed, the cursor becomes zero
+	// If a table is empty and the 'down' or 'up' key is pressed, the cursor becomes -1
 	// This may be a bug in Bubbles? Might also be intended
 	if cursor < 0 {
 		return
 	}
-	groupsRight, err := m.database.Parsed().GetPath(append(m.path, cursor))
+	m.populate(&m.right, append(m.path, cursor))
+}
+
+func (m *Navigate) populate(t *table.Model, path []int) {
+	groups, err := m.database.Parsed().GetPath(path)
 	if err != nil {
-		m.right.SetRows([]table.Row{})
 		log.Printf("ERROR: %s", err)
 		return
 	}
-	rows := make([]table.Row, len(groupsRight))
-	for i, group := range groupsRight {
+	rows := make([]table.Row, len(groups))
+	for i, group := range groups {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 	}
-	m.right.SetRows(rows)
+	t.SetRows(rows)
 }
 
 func (m *Navigate) moveLeft() {
