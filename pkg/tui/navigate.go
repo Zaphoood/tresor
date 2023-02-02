@@ -30,6 +30,11 @@ var columns []table.Column = []table.Column{
 	{Title: "Entries", Width: 10},
 }
 
+var columnsWide []table.Column = []table.Column{
+	{Title: "Name", Width: 60},
+	{Title: "Entries", Width: 10},
+}
+
 func NewNavigate(database *kp.Database, windowWidth, windowHeight int) Navigate {
 	n := Navigate{
 		path:         []int{0},
@@ -49,7 +54,7 @@ func NewNavigate(database *kp.Database, windowWidth, windowHeight int) Navigate 
 	)
 	n.right = table.New(
 		table.WithWidth(windowWidth-n.left.Width()-n.center.Width()),
-		table.WithColumns(columns),
+		table.WithColumns(columnsWide),
 	)
 	n.populateAll()
 
@@ -57,13 +62,19 @@ func NewNavigate(database *kp.Database, windowWidth, windowHeight int) Navigate 
 }
 
 func (m *Navigate) populateAll() {
-	if len(m.path) > 0 {
-		m.populate(&m.left, m.path[:len(m.path)-1])
-		m.left.SetCursor(m.path[len(m.path)-1])
-	} else {
+	if len(m.path) == 0 {
 		m.left.SetRows([]table.Row{})
+	} else {
+		err := m.populate(&m.left, m.path[:len(m.path)-1])
+		if err != nil {
+			log.Printf("ERROR: %s", err)
+		}
+		m.left.SetCursor(m.path[len(m.path)-1])
 	}
-	m.populate(&m.center, m.path)
+	err := m.populate(&m.center, m.path)
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+	}
 	m.center.SetCursor(0)
 
 	m.populateRight()
@@ -74,22 +85,34 @@ func (m *Navigate) populateRight() {
 	// If a table is empty and the 'down' or 'up' key is pressed, the cursor becomes -1
 	// This may be a bug in Bubbles? Might also be intended
 	if cursor < 0 {
+		m.right.SetRows([]table.Row{})
 		return
 	}
-	m.populate(&m.right, append(m.path, cursor))
-}
-
-func (m *Navigate) populate(t *table.Model, path []int) {
-	groups, err := m.database.Parsed().GetPath(path)
+	err := m.populate(&m.right, append(m.path, cursor))
 	if err != nil {
 		log.Printf("ERROR: %s", err)
-		return
 	}
-	rows := make([]table.Row, len(groups))
+}
+
+func (m *Navigate) populate(t *table.Model, path []int) error {
+	groups, entries, err := m.database.Parsed().GetPath(path)
+	if err != nil {
+		return err
+	}
+	rows := make([]table.Row, len(groups)+len(entries))
 	for i, group := range groups {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 	}
+	for i, entry := range entries {
+		title, err := entry.Get("Title")
+		if err != nil {
+			title = "(No title)"
+		}
+		rows[len(groups)+i] = table.Row{title, ""}
+	}
 	t.SetRows(rows)
+
+	return nil
 }
 
 func (m *Navigate) moveLeft() {
