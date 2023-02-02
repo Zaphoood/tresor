@@ -11,18 +11,17 @@ type Bool struct {
 	value bool
 }
 
-func (l *Bool) IsSet() bool {
-	return l.isSet
+func (b *Bool) IsSet() bool {
+	return b.isSet
 }
 
-func (l *Bool) Value() bool {
-	return l.value
+func (b *Bool) Value() bool {
+	return b.value
 }
 
-func (l *Bool) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	l.isSet = false
+func (b *Bool) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	b.isSet = false
 	var charData xml.CharData
-	charData = nil
 	end := false
 	for !end {
 		token, err := d.Token()
@@ -37,18 +36,18 @@ func (l *Bool) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		}
 	}
 	if charData == nil {
-		return nil
+		return fmt.Errorf("Failed to unmarshal element '%s' as literal bool: empty element", start.Name.Local)
 	}
 	switch string(charData) {
 	case "True":
-		l.isSet = true
-		l.value = true
+		b.isSet = true
+		b.value = true
 		return nil
 	case "False":
-		l.isSet = true
-		l.value = false
+		b.isSet = true
+		b.value = false
 		return nil
 	default:
-		return fmt.Errorf("Failed to parse element '%s' as literal bool. Want 'True' or 'False', got %s", start.Name.Local, charData)
+		return fmt.Errorf("Failed to unmarshal element '%s' as literal bool. Want 'True' or 'False', got '%s'", start.Name.Local, charData)
 	}
 }
