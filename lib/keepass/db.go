@@ -372,9 +372,6 @@ func (d *Database) Parse() error {
 	if err != nil {
 		return err
 	}
-	for _, group := range d.parsed.Root.Groups {
-		log.Printf("  %s\n", group.Name)
-	}
 
 	return nil
 }

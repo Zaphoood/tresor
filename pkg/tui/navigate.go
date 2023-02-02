@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"log"
 
 	kp "github.com/Zaphoood/tresor/lib/keepass"
 	"github.com/charmbracelet/bubbles/table"
@@ -56,28 +57,50 @@ func NewNavigate(database *kp.Database, windowWidth, windowHeight int) Navigate 
 }
 
 func (m *Navigate) populateAll() {
-	root := &m.database.Parsed().Root
-
-	rows := make([]table.Row, len(root.Groups))
-	for i, group := range root.Groups {
-		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
+	if len(m.path) > 0 {
+		groupsLeft, err := m.database.Parsed().GetPath(m.path[:len(m.path)-1])
+		if err != nil {
+			log.Printf("ERROR: %s", err)
+			return
+		}
+		rows := make([]table.Row, len(groupsLeft))
+		for i, group := range groupsLeft {
+			rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
+		}
+		m.left.SetRows(rows)
+	} else {
+		m.left.SetRows([]table.Row{})
 	}
-	m.left.SetRows(rows)
-
-	second := root.Groups[0]
-	rows = make([]table.Row, len(second.Groups))
-	for i, group := range second.Groups {
+	groupsCenter, err := m.database.Parsed().GetPath(m.path)
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+		return
+	}
+	rows := make([]table.Row, len(groupsCenter))
+	for i, group := range groupsCenter {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 	}
 	m.center.SetRows(rows)
+	m.center.SetCursor(0)
 
 	m.populateRight()
 }
 
 func (m *Navigate) populateRight() {
-	group_right := &m.database.Parsed().Root.Groups[0].Groups[m.center.Cursor()]
-	rows := make([]table.Row, len(group_right.Groups))
-	for i, group := range group_right.Groups {
+	cursor := m.center.Cursor()
+	// If a table is empty and the 'down' or 'up' key is pressed, the cursor becomes zero
+	// This may be a bug in Bubbles? Might also be intended
+	if cursor < 0 {
+		return
+	}
+	groupsRight, err := m.database.Parsed().GetPath(append(m.path, cursor))
+	if err != nil {
+		m.right.SetRows([]table.Row{})
+		log.Printf("ERROR: %s", err)
+		return
+	}
+	rows := make([]table.Row, len(groupsRight))
+	for i, group := range groupsRight {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 	}
 	m.right.SetRows(rows)
@@ -94,8 +117,21 @@ func (m Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windowHeight = msg.Height
 		return m, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "ctrl+c":
 			return m, tea.Quit
+		case "l":
+			if len(m.center.Rows()) == 0 {
+				break
+			}
+			m.path = append(m.path, m.center.Cursor())
+			m.populateAll()
+		case "h":
+			if len(m.path) == 0 {
+				break
+			}
+			m.path = m.path[:len(m.path)-1]
+			m.populateAll()
 		}
 	}
 	cursor := m.center.Cursor()
