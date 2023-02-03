@@ -113,7 +113,13 @@ func (m *Navigate) updateTable(t *table.Model, path []int) (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	m.setItems(t, groups, entries)
+	if len(groups)+len(entries) > 0 {
+		m.setItems(t, groups, entries)
+	} else {
+		t.SetRows([]table.Row{
+			{"(No entries)", ""},
+		})
+	}
 	return len(groups), len(entries), nil
 }
 
