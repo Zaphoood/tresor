@@ -13,11 +13,12 @@ import (
 /* Model for navigating the Database in order to view and edit entries */
 
 type Navigate struct {
-	left   table.Model
-	center table.Model
-	right  table.Model
-	path   []int
-	err    error
+	left         table.Model
+	center       table.Model
+	right        table.Model
+	groupsCenter int
+	path         []int
+	err          error
 
 	windowWidth  int
 	windowHeight int
@@ -31,7 +32,7 @@ var columns []table.Column = []table.Column{
 }
 
 var columnsWide []table.Column = []table.Column{
-	{Title: "Name", Width: 60},
+	{Title: "Name", Width: 50},
 	{Title: "Entries", Width: 10},
 }
 
@@ -56,22 +57,23 @@ func NewNavigate(database *kp.Database, windowWidth, windowHeight int) Navigate 
 		table.WithWidth(windowWidth-n.left.Width()-n.center.Width()),
 		table.WithColumns(columnsWide),
 	)
-	n.populateAll()
+	n.populateAllTables()
 
 	return n
 }
 
-func (m *Navigate) populateAll() {
+func (m *Navigate) populateAllTables() {
 	if len(m.path) == 0 {
 		m.left.SetRows([]table.Row{})
 	} else {
-		err := m.populate(&m.left, m.path[:len(m.path)-1])
+		_, _, err := m.populateTable(&m.left, m.path[:len(m.path)-1])
 		if err != nil {
 			log.Printf("ERROR: %s", err)
 		}
 		m.left.SetCursor(m.path[len(m.path)-1])
 	}
-	err := m.populate(&m.center, m.path)
+	var err error
+	m.groupsCenter, _, err = m.populateTable(&m.center, m.path)
 	if err != nil {
 		log.Printf("ERROR: %s", err)
 	}
@@ -88,16 +90,35 @@ func (m *Navigate) populateRight() {
 		m.right.SetRows([]table.Row{})
 		return
 	}
-	err := m.populate(&m.right, append(m.path, cursor))
-	if err != nil {
-		log.Printf("ERROR: %s", err)
+	if cursor < m.groupsCenter {
+		// A group is focused
+		_, _, err := m.populateTable(&m.right, append(m.path, cursor))
+		if err != nil {
+			log.Printf("ERROR: %s", err)
+		}
+	} else {
+		// An entry is focused
+		m.populateEntry(&m.right, append(m.path, cursor))
 	}
 }
 
-func (m *Navigate) populate(t *table.Model, path []int) error {
+func (m *Navigate) populateEntry(t *table.Model, path []int) {
+	_, entries, err := m.database.Parsed().GetPath(path[:len(path)-1])
+	entry := entries[path[len(path)-1]-m.groupsCenter]
+	title, err := entry.Get("Title")
+	if err != nil {
+		title = "(No title)"
+	}
+	rows := []table.Row{
+		{fmt.Sprintf("Title: %s", title), ""},
+	}
+	m.right.SetRows(rows)
+}
+
+func (m *Navigate) populateTable(t *table.Model, path []int) (int, int, error) {
 	groups, entries, err := m.database.Parsed().GetPath(path)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	rows := make([]table.Row, len(groups)+len(entries))
 	for i, group := range groups {
@@ -108,11 +129,12 @@ func (m *Navigate) populate(t *table.Model, path []int) error {
 		if err != nil {
 			title = "(No title)"
 		}
+
 		rows[len(groups)+i] = table.Row{title, ""}
 	}
 	t.SetRows(rows)
 
-	return nil
+	return len(groups), len(entries), nil
 }
 
 func (m *Navigate) moveLeft() {
@@ -120,15 +142,16 @@ func (m *Navigate) moveLeft() {
 		return
 	}
 	m.path = m.path[:len(m.path)-1]
-	m.populateAll()
+	m.populateAllTables()
 }
 
 func (m *Navigate) moveRight() {
-	if len(m.center.Rows()) == 0 {
+	cursor := m.center.Cursor()
+	if cursor >= m.groupsCenter {
 		return
 	}
 	m.path = append(m.path, m.center.Cursor())
-	m.populateAll()
+	m.populateAllTables()
 }
 
 func (m Navigate) Init() tea.Cmd {
