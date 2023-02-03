@@ -5,6 +5,7 @@ import (
 	"log"
 
 	kp "github.com/Zaphoood/tresor/lib/keepass"
+	"github.com/Zaphoood/tresor/lib/keepass/parser"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -13,9 +14,9 @@ import (
 /* Model for navigating the Database in order to view and edit entries */
 
 type Navigate struct {
-	left         table.Model
-	center       table.Model
-	right        table.Model
+	parent       table.Model
+	selector     table.Model
+	preview      table.Model
 	groupsCenter int
 	path         []int
 	err          error
@@ -44,67 +45,79 @@ func NewNavigate(database *kp.Database, windowWidth, windowHeight int) Navigate 
 		database:     database,
 	}
 
-	n.left = table.New(
+	n.parent = table.New(
 		table.WithWidth(int(float64(windowWidth)*0.2)),
 		table.WithColumns(columns),
 	)
-	n.center = table.New(
+	n.selector = table.New(
 		table.WithWidth(int(float64(windowWidth)*0.4)),
 		table.WithColumns(columns),
 		table.WithFocused(true),
 	)
-	n.right = table.New(
-		table.WithWidth(windowWidth-n.left.Width()-n.center.Width()),
+	n.preview = table.New(
+		table.WithWidth(windowWidth-n.parent.Width()-n.selector.Width()),
 		table.WithColumns(columnsWide),
 	)
-	n.populateAllTables()
+	n.updateAllTables()
 
 	return n
 }
 
-func (m *Navigate) populateAllTables() {
+func (m *Navigate) updateAllTables() {
 	if len(m.path) == 0 {
-		m.left.SetRows([]table.Row{})
+		m.parent.SetRows([]table.Row{})
 	} else {
-		_, _, err := m.populateTable(&m.left, m.path[:len(m.path)-1])
+		_, _, err := m.updateTable(&m.parent, m.path[:len(m.path)-1])
 		if err != nil {
 			log.Printf("ERROR: %s", err)
 		}
-		m.left.SetCursor(m.path[len(m.path)-1])
+		m.parent.SetCursor(m.path[len(m.path)-1])
 	}
 	var err error
-	m.groupsCenter, _, err = m.populateTable(&m.center, m.path)
+	m.groupsCenter, _, err = m.updateTable(&m.selector, m.path)
 	if err != nil {
 		log.Printf("ERROR: %s", err)
 	}
-	m.center.SetCursor(0)
+	m.selector.SetCursor(0)
 
-	m.populateRight()
+	m.updateRightTable()
 }
 
-func (m *Navigate) populateRight() {
-	cursor := m.center.Cursor()
+func (m *Navigate) updateRightTable() {
+	cursor := m.selector.Cursor()
 	// If a table is empty and the 'down' or 'up' key is pressed, the cursor becomes -1
 	// This may be a bug in Bubbles? Might also be intended
 	if cursor < 0 {
-		m.right.SetRows([]table.Row{})
+		m.preview.SetRows([]table.Row{})
 		return
 	}
-	if cursor < m.groupsCenter {
+	item, err := m.database.Parsed().GetItem(append(m.path, cursor))
+	if err != nil {
+		log.Printf("ERROR: %s", err)
+		return
+	}
+	switch item := item.(type) {
+	case parser.Group:
 		// A group is focused
-		_, _, err := m.populateTable(&m.right, append(m.path, cursor))
-		if err != nil {
-			log.Printf("ERROR: %s", err)
-		}
-	} else {
+		m.setItems(&m.preview, item.Groups, item.Entries)
+	case parser.Entry:
 		// An entry is focused
-		m.populateEntry(&m.right, append(m.path, cursor))
+		m.loadEntry(&m.preview, item)
+	default:
+		log.Printf("ERROR: Expected Group or Entry")
 	}
 }
 
-func (m *Navigate) populateEntry(t *table.Model, path []int) {
-	_, entries, err := m.database.Parsed().GetPath(path[:len(path)-1])
-	entry := entries[path[len(path)-1]-m.groupsCenter]
+func (m *Navigate) updateTable(t *table.Model, path []int) (int, int, error) {
+	groups, entries, err := m.database.Parsed().ListPath(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	m.setItems(t, groups, entries)
+	return len(groups), len(entries), nil
+}
+
+func (m *Navigate) loadEntry(t *table.Model, entry parser.Entry) {
 	title, err := entry.Get("Title")
 	if err != nil {
 		title = "(No title)"
@@ -112,14 +125,10 @@ func (m *Navigate) populateEntry(t *table.Model, path []int) {
 	rows := []table.Row{
 		{fmt.Sprintf("Title: %s", title), ""},
 	}
-	m.right.SetRows(rows)
+	m.preview.SetRows(rows)
 }
 
-func (m *Navigate) populateTable(t *table.Model, path []int) (int, int, error) {
-	groups, entries, err := m.database.Parsed().GetPath(path)
-	if err != nil {
-		return 0, 0, err
-	}
+func (m *Navigate) setItems(t *table.Model, groups []parser.Group, entries []parser.Entry) {
 	rows := make([]table.Row, len(groups)+len(entries))
 	for i, group := range groups {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
@@ -133,8 +142,6 @@ func (m *Navigate) populateTable(t *table.Model, path []int) (int, int, error) {
 		rows[len(groups)+i] = table.Row{title, ""}
 	}
 	t.SetRows(rows)
-
-	return len(groups), len(entries), nil
 }
 
 func (m *Navigate) moveLeft() {
@@ -142,16 +149,16 @@ func (m *Navigate) moveLeft() {
 		return
 	}
 	m.path = m.path[:len(m.path)-1]
-	m.populateAllTables()
+	m.updateAllTables()
 }
 
 func (m *Navigate) moveRight() {
-	cursor := m.center.Cursor()
-	if cursor >= m.groupsCenter {
+	cursor := m.selector.Cursor()
+	if cursor < 0 || cursor >= m.groupsCenter {
 		return
 	}
-	m.path = append(m.path, m.center.Cursor())
-	m.populateAllTables()
+	m.path = append(m.path, m.selector.Cursor())
+	m.updateAllTables()
 }
 
 func (m Navigate) Init() tea.Cmd {
@@ -174,16 +181,16 @@ func (m Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.moveLeft()
 		}
 	}
-	cursor := m.center.Cursor()
+	cursor := m.selector.Cursor()
 	var cmd tea.Cmd
-	m.center, cmd = m.center.Update(msg)
-	if cursor != m.center.Cursor() {
-		m.populateRight()
+	m.selector, cmd = m.selector.Update(msg)
+	if cursor != m.selector.Cursor() {
+		m.updateRightTable()
 	}
 
 	return m, cmd
 }
 
 func (m Navigate) View() string {
-	return lipgloss.JoinHorizontal(0, m.left.View(), m.center.View(), m.right.View())
+	return lipgloss.JoinHorizontal(0, m.parent.View(), m.selector.View(), m.preview.View())
 }

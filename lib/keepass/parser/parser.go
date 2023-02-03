@@ -143,10 +143,10 @@ func Parse(b []byte) (*Document, error) {
 	return &p, nil
 }
 
-// GetPath returns subgroups and entries of a group specified by an array of indices. The document is traversed,
+// ListPath returns subgroups and entries of a group specified by an array of indices. The document is traversed,
 // each level choosing the group with the current index, until the end of the path is reached.
 // An empty path will result in the top-level groups being returned
-func (d *Document) GetPath(path []int) ([]Group, []Entry, error) {
+func (d *Document) ListPath(path []int) ([]Group, []Entry, error) {
 	entries := []Entry{}
 	current := &d.Root.Groups
 	for i := 0; i < len(path); i++ {
@@ -159,4 +159,19 @@ func (d *Document) GetPath(path []int) ([]Group, []Entry, error) {
 		current = &(*current)[path[i]].Groups
 	}
 	return *current, entries, nil
+}
+
+func (d *Document) GetItem(path []int) (interface{}, error) {
+	groups, entries, err := d.ListPath(path[:len(path)-1])
+	if err != nil {
+		return nil, err
+	}
+	index := path[len(path)-1]
+	if index < len(groups) {
+		return groups[index], nil
+	} else if index < len(groups)+len(entries) {
+		return entries[index-len(groups)], nil
+	} else {
+		return nil, fmt.Errorf("Item index out of range: %d", index)
+	}
 }

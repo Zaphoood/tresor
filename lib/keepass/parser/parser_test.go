@@ -51,7 +51,7 @@ func TestParse(t *testing.T) {
 	}
 
 	path := []int{0, 3, 1}
-	groups, _, err := parsed.GetPath(path)
+	groups, _, err := parsed.ListPath(path)
 	if err != nil {
 		log.Fatal(err)
 	}
