@@ -118,6 +118,14 @@ func (e *Entry) Get(key string) (string, error) {
 	return "", fmt.Errorf("No such key: %s", key)
 }
 
+func (e *Entry) TryGet(key, fallback string) string {
+	result, err := e.Get(key)
+	if err != nil {
+		return fallback
+	}
+	return result
+}
+
 type String struct {
 	XMLName xml.Name `xml:"String"`
 	Key     string

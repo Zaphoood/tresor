@@ -118,10 +118,7 @@ func (m *Navigate) updateTable(t *table.Model, path []int) (int, int, error) {
 }
 
 func (m *Navigate) loadEntry(t *table.Model, entry parser.Entry) {
-	title, err := entry.Get("Title")
-	if err != nil {
-		title = "(No title)"
-	}
+	title := entry.TryGet("Title", "(No title)")
 	rows := []table.Row{
 		{fmt.Sprintf("Title: %s", title), ""},
 	}
@@ -134,11 +131,7 @@ func (m *Navigate) setItems(t *table.Model, groups []parser.Group, entries []par
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 	}
 	for i, entry := range entries {
-		title, err := entry.Get("Title")
-		if err != nil {
-			title = "(No title)"
-		}
-
+		title := entry.TryGet("Title", "(No title)")
 		rows[len(groups)+i] = table.Row{title, ""}
 	}
 	t.SetRows(rows)
