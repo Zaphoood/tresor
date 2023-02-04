@@ -7,8 +7,8 @@ import (
 	"github.com/Zaphoood/tresor/lib/keepass"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -86,9 +86,16 @@ func (n *Navigate) updatePreview() {
 	}
 	item, err := n.database.Parsed().GetItem(append(n.path, cursor))
 	if err != nil {
-		n.preview.SetRows([]table.Row{
-			{err.Error(), ""},
-		})
+		switch err := err.(type) {
+		case parser.PathOutOfRange:
+			n.preview.SetRows([]table.Row{
+				{"", ""},
+			})
+		default:
+			n.preview.SetRows([]table.Row{
+				{err.Error(), ""},
+			})
+		}
 		return
 	}
 	switch item := item.(type) {

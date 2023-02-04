@@ -158,8 +158,9 @@ func (d *Document) ListPath(path []int) ([]Group, []Entry, error) {
 	entries := []Entry{}
 	current := &d.Root.Groups
 	for i := 0; i < len(path); i++ {
-		if path[i] >= len(*current) {
-			return []Group{}, []Entry{}, fmt.Errorf("Path entry at position %d is out of range: %d >= %d", i, path[i], len(*current))
+		if path[i] < 0 || path[i] >= len(*current) {
+			return []Group{}, []Entry{},
+				PathOutOfRange{fmt.Errorf("Path entry at position %d is out of range: %d >= %d", i, path[i], len(*current))}
 		}
 		if i == len(path)-1 {
 			entries = (*current)[path[i]].Entries
@@ -180,6 +181,14 @@ func (d *Document) GetItem(path []int) (interface{}, error) {
 	} else if index < len(groups)+len(entries) {
 		return entries[index-len(groups)], nil
 	} else {
-		return nil, fmt.Errorf("Item index out of range: %d", index)
+		return nil, PathOutOfRange{fmt.Errorf("Item index out of range: %d", index)}
 	}
+}
+
+type PathOutOfRange struct {
+	err error
+}
+
+func (p PathOutOfRange) Error() string {
+	return p.err.Error()
 }
