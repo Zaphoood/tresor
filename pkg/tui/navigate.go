@@ -27,14 +27,9 @@ type Navigate struct {
 	database *keepass.Database
 }
 
-var columns []table.Column = []table.Column{
-	{Title: "Name", Width: 25},
-	{Title: "Entries", Width: 10},
-}
-
-var columnsWide []table.Column = []table.Column{
-	{Title: "Name", Width: 50},
-	{Title: "Entries", Width: 10},
+var columnNames [2]string = [2]string{
+	"Name",
+	"Entries",
 }
 
 func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navigate {
@@ -44,23 +39,38 @@ func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navi
 		windowHeight: windowHeight,
 		database:     database,
 	}
-
-	n.parent = table.New(
-		table.WithWidth(int(float64(windowWidth)*0.2)),
-		table.WithColumns(columns),
-	)
-	n.selector = table.New(
-		table.WithWidth(int(float64(windowWidth)*0.4)),
-		table.WithColumns(columns),
-		table.WithFocused(true),
-	)
-	n.preview = table.New(
-		table.WithWidth(windowWidth-n.parent.Width()-n.selector.Width()),
-		table.WithColumns(columnsWide),
-	)
+	n.parent = table.New()
+	n.selector = table.New(table.WithFocused(true))
+	n.preview = table.New()
+	n.resizeTables()
 	n.updateAll()
 
 	return n
+}
+
+func (n *Navigate) resizeTables() {
+	styles := table.DefaultStyles()
+
+	selectorWidth := int(float64(n.windowWidth) * 0.3)
+	previewWidth := int(float64(n.windowWidth) * 0.5)
+	parentWidth := n.windowWidth - selectorWidth - previewWidth
+
+	n.resizeTable(&n.parent, &styles, parentWidth)
+	n.resizeTable(&n.selector, &styles, selectorWidth)
+	n.resizeTable(&n.preview, &styles, previewWidth)
+}
+
+func (n *Navigate) resizeTable(t *table.Model, styles *table.Styles, width int) {
+	t.SetWidth(width)
+	t.SetHeight(n.windowHeight - 1)
+	styles.Header.GetPaddingLeft()
+	columns := []table.Column{
+		{Title: columnNames[0], Width: width - len(columnNames[1]) -
+			2*(styles.Header.GetPaddingLeft()+styles.Header.GetPaddingRight())},
+		{Title: columnNames[1], Width: len(columnNames[1])},
+	}
+	t.SetStyles(*styles)
+	t.SetColumns(columns)
 }
 
 func (n *Navigate) updateAll() {
@@ -176,6 +186,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
+		n.resizeTables()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -198,5 +209,5 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (n Navigate) View() string {
-	return lipgloss.JoinHorizontal(0, n.parent.View(), n.selector.View(), n.preview.View())
+	return lipgloss.JoinHorizontal(lipgloss.Top, n.parent.View(), n.selector.View(), n.preview.View())
 }
