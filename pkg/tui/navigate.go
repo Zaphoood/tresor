@@ -18,6 +18,7 @@ type Navigate struct {
 	parent   table.Model
 	selector table.Model
 	preview  table.Model
+	styles   table.Styles
 	path     []int
 	err      error
 
@@ -34,42 +35,39 @@ var columnNames [2]string = [2]string{
 
 func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navigate {
 	n := Navigate{
+		styles:       table.DefaultStyles(),
 		path:         []int{0},
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
 		database:     database,
 	}
-	n.parent = table.New()
-	n.selector = table.New(table.WithFocused(true))
-	n.preview = table.New()
-	n.resizeTables()
+	n.parent = table.New(table.WithStyles(n.styles))
+	n.selector = table.New(table.WithStyles(n.styles), table.WithFocused(true))
+	n.preview = table.New(table.WithStyles(n.styles))
+	n.resizeAll()
 	n.updateAll()
 
 	return n
 }
 
-func (n *Navigate) resizeTables() {
-	styles := table.DefaultStyles()
-
+func (n *Navigate) resizeAll() {
 	selectorWidth := int(float64(n.windowWidth) * 0.3)
 	previewWidth := int(float64(n.windowWidth) * 0.5)
 	parentWidth := n.windowWidth - selectorWidth - previewWidth
 
-	n.resizeTable(&n.parent, &styles, parentWidth)
-	n.resizeTable(&n.selector, &styles, selectorWidth)
-	n.resizeTable(&n.preview, &styles, previewWidth)
+	n.resizeTable(&n.parent, parentWidth)
+	n.resizeTable(&n.selector, selectorWidth)
+	n.resizeTable(&n.preview, previewWidth)
 }
 
-func (n *Navigate) resizeTable(t *table.Model, styles *table.Styles, width int) {
+func (n *Navigate) resizeTable(t *table.Model, width int) {
 	t.SetWidth(width)
 	t.SetHeight(n.windowHeight - 1)
-	styles.Header.GetPaddingLeft()
 	columns := []table.Column{
 		{Title: columnNames[0], Width: width - len(columnNames[1]) -
-			2*(styles.Header.GetPaddingLeft()+styles.Header.GetPaddingRight())},
+			2*(n.styles.Header.GetPaddingLeft()+n.styles.Header.GetPaddingRight())},
 		{Title: columnNames[1], Width: len(columnNames[1])},
 	}
-	t.SetStyles(*styles)
 	t.SetColumns(columns)
 }
 
@@ -186,7 +184,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
-		n.resizeTables()
+		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
