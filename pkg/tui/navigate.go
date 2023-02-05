@@ -30,6 +30,7 @@ type Navigate struct {
 	entryPreview itemTable
 	// previewEntry is true when an Entry is focused, false when a Group is focused
 	previewEntry bool
+	lastSelected map[string]int
 	styles       table.Styles
 	path         []int
 	err          error
@@ -44,6 +45,7 @@ func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navi
 	n := Navigate{
 		styles:       table.DefaultStyles(),
 		path:         []int{0},
+		lastSelected: make(map[string]int),
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
 		database:     database,
@@ -52,8 +54,8 @@ func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navi
 	n.selector = newItemTable(n.styles, itemViewColumns, table.WithFocused(true))
 	n.groupPreview = newItemTable(n.styles, itemViewColumns)
 	n.entryPreview = newItemTable(table.Styles{
-		Header: n.styles.Header.Copy(),
-		Cell: n.styles.Cell.Copy(),
+		Header:   n.styles.Header.Copy(),
+		Cell:     n.styles.Cell.Copy(),
 		Selected: lipgloss.NewStyle(),
 	}, entryViewColumns)
 	n.previewEntry = false
@@ -80,12 +82,12 @@ func (n *Navigate) updateAll() {
 	if len(n.path) == 0 {
 		n.parent.Clear()
 	} else {
-		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1])
-		n.parent.SetCursor(n.path[len(n.path)-1])
+		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], &n.lastSelected)
+		//n.parent.SetCursor(n.path[len(n.path)-1])
 	}
 
-	n.selector.Load(n.database.Parsed(), n.path)
-	n.selector.SetCursor(0)
+	n.selector.Load(n.database.Parsed(), n.path, &n.lastSelected)
+	//n.selector.SetCursor(0)
 
 	n.updatePreview()
 }
@@ -111,7 +113,7 @@ func (n *Navigate) updatePreview() {
 	switch item := item.(type) {
 	case parser.Group:
 		// A group is focused
-		n.groupPreview.LoadGroup(item)
+		n.groupPreview.LoadGroup(item, &n.lastSelected)
 		n.previewEntry = false
 	case parser.Entry:
 		// An entry is focused
@@ -126,6 +128,7 @@ func (n *Navigate) moveLeft() {
 	if len(n.path) == 0 {
 		return
 	}
+	n.rememberSelected()
 	n.path = n.path[:len(n.path)-1]
 	n.updateAll()
 }
@@ -139,8 +142,20 @@ func (n *Navigate) moveRight() {
 	if _, ok := selected.(parser.Group); !ok {
 		return
 	}
+	n.rememberSelected()
 	n.path = append(n.path, n.selector.Cursor())
 	n.updateAll()
+}
+
+func (n *Navigate) rememberSelected() {
+	currentGroup, err := n.database.Parsed().GetItem(n.path)
+	if currentGroup, ok := currentGroup.(parser.Group); err == nil && ok {
+		n.lastSelected[currentGroup.UUID] = n.selector.Cursor()
+	}
+	log.Println("----")
+	for key, value := range n.lastSelected {
+		log.Printf(" * %s: %d\n", key, value)
+	}
 }
 
 func (n Navigate) Init() tea.Cmd {

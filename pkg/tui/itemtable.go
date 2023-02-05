@@ -86,7 +86,7 @@ func (t *itemTable) View() string {
 	return t.Model.View()
 }
 
-func (t *itemTable) Load(d *parser.Document, path []int) {
+func (t *itemTable) Load(d *parser.Document, path []int, lastSelected *map[string]int) {
 	item, err := d.GetItem(path)
 	if err != nil {
 		t.SetRows([]table.Row{
@@ -103,12 +103,19 @@ func (t *itemTable) Load(d *parser.Document, path []int) {
 			{"(No entries)", ""},
 		})
 	} else {
-		t.SetItems(group.Groups, group.Entries)
+		t.LoadGroup(group, lastSelected)
 	}
 }
 
-func (t *itemTable) LoadGroup(group parser.Group) {
+func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]int) {
 	t.SetItems(group.Groups, group.Entries)
+
+	index, exists := (*lastSelected)[group.UUID]
+	if exists && index < len(t.Model.Rows()) {
+		t.SetCursor(index)
+	} else {
+		t.SetCursor(0)
+	}
 }
 
 func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
