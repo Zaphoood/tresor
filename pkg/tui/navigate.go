@@ -13,14 +13,14 @@ import (
 
 /* Model for navigating the Database in order to view and edit entries */
 
-var itemViewColumns []sizedColumn = []sizedColumn{
-	{"Name", 0},
-	{"Entries", 7},
+var itemViewColumns []table.Column = []table.Column{
+	{Title: "Name", Width: 0},
+	{Title: "Entries", Width: 7},
 }
 
-var entryViewColumns []sizedColumn = []sizedColumn{
-	{"Key", 40},
-	{"Value", 0},
+var entryViewColumns []table.Column = []table.Column{
+	{Title: "Key", Width: 40},
+	{Title: "Value", Width: 0},
 }
 
 type Navigate struct {
@@ -194,7 +194,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (n Navigate) View() string {
 	var preview string
-	if (n.previewEntry) {
+	if n.previewEntry {
 		preview = n.entryPreview.View()
 	} else {
 		preview = n.groupPreview.View()

@@ -8,10 +8,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type sizedColumn struct {
-	name  string
-	width int
-}
+const (
+	TITLE_PLACEH     = "(No title)"
+	ENCRYPTED_PLACEH = "******"
+)
 
 type entryField struct {
 	key          string
@@ -20,18 +20,23 @@ type entryField struct {
 }
 
 var defaultFields []entryField = []entryField{
-	{"Title", "Title", "(No title)"},
+	{"Title", "Title", TITLE_PLACEH},
 	{"UserName", "Username", ""},
 	{"Password", "Password", ""},
 }
 
+//type sizedColumn struct {
+//	name  string
+//	width int
+//}
+
 type itemTable struct {
 	table.Model
 	styles  table.Styles
-	columns []sizedColumn
+	columns []table.Column
 }
 
-func newItemTable(styles table.Styles, columns []sizedColumn, options ...table.Option) itemTable {
+func newItemTable(styles table.Styles, columns []table.Column, options ...table.Option) itemTable {
 	return itemTable{
 		Model:   table.New(append(options, table.WithStyles(styles))...),
 		styles:  styles,
@@ -39,29 +44,29 @@ func newItemTable(styles table.Styles, columns []sizedColumn, options ...table.O
 	}
 }
 
-// Set size will set fixed columns to their size and scale a column with width 0 dynamically
-// Don't set the width to 0 for more than one column -- it won't work
+// Set size will set all columns to their given size and additionally scale oone column with width 0 dynamically
+// to fit the width of the table. Don't set the width to 0 for more than one column -- it won't work
 func (t *itemTable) SetSize(width, height int) {
 	t.SetWidth(width)
 	t.SetHeight(height)
 	totalFixed := 0
 	dynamicIndex := -1
 	for i, column := range t.columns {
-		if column.width == 0 {
+		if column.Width == 0 {
 			dynamicIndex = i
 		}
-		totalFixed += column.width
+		totalFixed += column.Width
 	}
 
 	newColumns := make([]table.Column, len(t.columns))
 	for i := range newColumns {
 		newColumns[i] = table.Column{
-			Title: t.columns[i].name,
+			Title: t.columns[i].Title,
 		}
 		if i == dynamicIndex {
 			newColumns[i].Width = width - totalFixed - 2*t.styles.Header.GetPaddingLeft() - 2*t.styles.Header.GetPaddingLeft()
 		} else {
-			newColumns[i].Width = t.columns[i].width
+			newColumns[i].Width = t.columns[i].Width
 		}
 	}
 
@@ -137,7 +142,7 @@ func (t *itemTable) LoadEntry(entry parser.Entry) {
 		r := entry.TryGet(field.key, field.defaultValue)
 		var value string
 		if r.IsProtected() {
-			value = "******"
+			value = ENCRYPTED_PLACEH
 		} else {
 			value = r.Chardata
 		}
@@ -149,7 +154,7 @@ func (t *itemTable) LoadEntry(entry parser.Entry) {
 			continue
 		}
 		if field.Value.IsProtected() {
-			rows = append(rows, table.Row{field.Key, "******"})
+			rows = append(rows, table.Row{field.Key, ENCRYPTED_PLACEH})
 		} else {
 			rows = append(rows, table.Row{field.Key, field.Value.Chardata})
 		}
