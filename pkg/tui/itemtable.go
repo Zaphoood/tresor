@@ -13,6 +13,18 @@ type sizedColumn struct {
 	width int
 }
 
+type entryField struct {
+	key          string
+	displayName  string
+	defaultValue string
+}
+
+var defaultFields []entryField = []entryField{
+	{"Title", "Title", "(No title)"},
+	{"UserName", "Username", ""},
+	{"Password", "Password", ""},
+}
+
 type itemTable struct {
 	table.Model
 	styles  table.Styles
@@ -91,22 +103,49 @@ func (t *itemTable) Load(d *parser.Document, path []int) {
 			{"(No entries)", ""},
 		})
 	} else {
-		t.setItems(group.Groups, group.Entries)
+		t.SetItems(group.Groups, group.Entries)
 	}
 }
 
 func (t *itemTable) LoadGroup(group parser.Group) {
-	t.setItems(group.Groups, group.Entries)
+	t.SetItems(group.Groups, group.Entries)
 }
 
-func (t *itemTable) setItems(groups []parser.Group, entries []parser.Entry) {
+func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	rows := make([]table.Row, len(groups)+len(entries))
 	for i, group := range groups {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 	}
 	for i, entry := range entries {
-		title := entry.TryGet("Title", "(No title)")
+		title := entry.TryGet("Title", "(No title)").Chardata
 		rows[len(groups)+i] = table.Row{title, ""}
+	}
+	t.SetRows(rows)
+}
+
+func (t *itemTable) LoadEntry(entry parser.Entry) {
+	rows := make([]table.Row, 0, len(entry.Strings))
+	visited := make(map[string]struct{})
+	for _, field := range defaultFields {
+		r := entry.TryGet(field.key, field.defaultValue)
+		var value string
+		if r.IsProtected() {
+			value = "******"
+		} else {
+			value = r.Chardata
+		}
+		rows = append(rows, table.Row{field.displayName, value})
+		visited[field.key] = struct{}{}
+	}
+	for _, field := range entry.Strings {
+		if _, v := visited[field.Key]; v {
+			continue
+		}
+		if field.Value.IsProtected() {
+			rows = append(rows, table.Row{field.Key, "******"})
+		} else {
+			rows = append(rows, table.Row{field.Key, field.Value.Chardata})
+		}
 	}
 	t.SetRows(rows)
 }

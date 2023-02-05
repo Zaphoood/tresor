@@ -125,19 +125,19 @@ type Association struct {
 	KeystrokeSequence string
 }
 
-func (e *Entry) Get(key string) (string, error) {
-	for _, str := range e.Strings {
-		if str.Key == key {
-			return str.Value.Chardata, nil
+func (e *Entry) Get(key string) (Value, error) {
+	for _, field := range e.Strings {
+		if field.Key == key {
+			return field.Value, nil
 		}
 	}
-	return "", fmt.Errorf("No such key: %s", key)
+	return Value{}, fmt.Errorf("No such key: %s", key)
 }
 
-func (e *Entry) TryGet(key, fallback string) string {
+func (e *Entry) TryGet(key, fallback string) Value {
 	result, err := e.Get(key)
 	if err != nil {
-		return fallback
+		return Value{Chardata: fallback}
 	}
 	return result
 }

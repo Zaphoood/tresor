@@ -38,8 +38,11 @@ func TestParse(t *testing.T) {
 	for _, group := range parsed.Root.Groups {
 		log.Printf(" * %s\n", group.Name)
 		for _, entry := range group.Entries {
-			title, err := entry.Get("Title")
-			if err != nil {
+			val, err := entry.Get("Title")
+			var title string
+			if err == nil {
+				title = val.Chardata
+			} else {
 				title = "(No title)"
 			}
 			log.Printf("   * %s (UUID: %s, history: %d)\n", title, entry.UUID, len(entry.History))

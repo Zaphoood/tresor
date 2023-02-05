@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/Zaphoood/tresor/lib/keepass"
@@ -19,13 +18,21 @@ var itemViewColumns []sizedColumn = []sizedColumn{
 	{"Entries", 7},
 }
 
+var entryViewColumns []sizedColumn = []sizedColumn{
+	{"Key", 40},
+	{"Value", 0},
+}
+
 type Navigate struct {
-	parent   itemTable
-	selector itemTable
-	preview  itemTable
-	styles   table.Styles
-	path     []int
-	err      error
+	parent       itemTable
+	selector     itemTable
+	groupPreview itemTable
+	entryPreview itemTable
+	// previewEntry is true when an Entry is focused, false when a Group is focused
+	previewEntry bool
+	styles       table.Styles
+	path         []int
+	err          error
 
 	windowWidth  int
 	windowHeight int
@@ -43,7 +50,14 @@ func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navi
 	}
 	n.parent = newItemTable(n.styles, itemViewColumns)
 	n.selector = newItemTable(n.styles, itemViewColumns, table.WithFocused(true))
-	n.preview = newItemTable(n.styles, itemViewColumns)
+	n.groupPreview = newItemTable(n.styles, itemViewColumns)
+	n.entryPreview = newItemTable(table.Styles{
+		Header: n.styles.Header.Copy(),
+		Cell: n.styles.Cell.Copy(),
+		Selected: lipgloss.NewStyle(),
+	}, entryViewColumns)
+	n.previewEntry = false
+
 	n.resizeAll()
 	n.updateAll()
 
@@ -58,19 +72,18 @@ func (n *Navigate) resizeAll() {
 
 	n.parent.SetSize(parentWidth, height)
 	n.selector.SetSize(selectorWidth, height)
-	n.preview.SetSize(previewWidth, height)
+	n.groupPreview.SetSize(previewWidth, height)
+	n.entryPreview.SetSize(previewWidth, height)
 }
 
 func (n *Navigate) updateAll() {
 	if len(n.path) == 0 {
 		n.parent.Clear()
 	} else {
-		//updateTable(&n.parent, n.database.Parsed(), n.path[:len(n.path)-1])
 		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1])
 		n.parent.SetCursor(n.path[len(n.path)-1])
 	}
 
-	//updateTable(&n.selector, n.database.Parsed(), n.path)
 	n.selector.Load(n.database.Parsed(), n.path)
 	n.selector.SetCursor(0)
 
@@ -82,14 +95,14 @@ func (n *Navigate) updatePreview() {
 	// If a table is empty and the 'down' or 'up' key is pressed, the cursor becomes -1
 	// This may be a bug in Bubbles? Might also be intended
 	if cursor < 0 {
-		n.preview.Clear()
+		n.groupPreview.Clear()
 		return
 	}
 	item, err := n.database.Parsed().GetItem(append(n.path, cursor))
 	if err != nil {
 		switch err := err.(type) {
 		case parser.PathOutOfRange:
-			n.preview.Clear()
+			n.groupPreview.Clear()
 		default:
 			log.Printf("ERROR: %s\n", err)
 		}
@@ -98,55 +111,15 @@ func (n *Navigate) updatePreview() {
 	switch item := item.(type) {
 	case parser.Group:
 		// A group is focused
-		n.preview.setItems(item.Groups, item.Entries)
+		n.groupPreview.LoadGroup(item)
+		n.previewEntry = false
 	case parser.Entry:
 		// An entry is focused
-		//n.loadEntry(&n.preview, item)
-		n.preview.Clear()
+		n.entryPreview.LoadEntry(item)
+		n.previewEntry = true
 	default:
 		log.Printf("ERROR: Expected Group or Entry in updatePreview")
 	}
-}
-
-func updateTable(t *table.Model, d *parser.Document, path []int) {
-	item, err := d.GetItem(path)
-	if err != nil {
-		t.SetRows([]table.Row{
-			{err.Error(), ""},
-		})
-	}
-	group, ok := item.(parser.Group)
-	if !ok {
-		t.SetRows([]table.Row{})
-		return
-	}
-	if len(group.Groups) == 0 && len(group.Entries) == 0 {
-		t.SetRows([]table.Row{
-			{"(No entries)", ""},
-		})
-	} else {
-		setItems(t, group.Groups, group.Entries)
-	}
-}
-
-func (n *Navigate) loadEntry(t *table.Model, entry parser.Entry) {
-	title := entry.TryGet("Title", "(No title)")
-	rows := []table.Row{
-		{fmt.Sprintf("Title: %s", title), ""},
-	}
-	n.preview.SetRows(rows)
-}
-
-func setItems(t *table.Model, groups []parser.Group, entries []parser.Entry) {
-	rows := make([]table.Row, len(groups)+len(entries))
-	for i, group := range groups {
-		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
-	}
-	for i, entry := range entries {
-		title := entry.TryGet("Title", "(No title)")
-		rows[len(groups)+i] = table.Row{title, ""}
-	}
-	t.SetRows(rows)
 }
 
 func (n *Navigate) moveLeft() {
@@ -205,5 +178,11 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (n Navigate) View() string {
-	return lipgloss.JoinHorizontal(lipgloss.Top, n.parent.View(), n.selector.View(), n.preview.View())
+	var preview string
+	if (n.previewEntry) {
+		preview = n.entryPreview.View()
+	} else {
+		preview = n.groupPreview.View()
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, n.parent.View(), n.selector.View(), preview)
 }
