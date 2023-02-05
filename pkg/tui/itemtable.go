@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	GROUP_PLACEH     = "(No entries)"
 	TITLE_PLACEH     = "(No title)"
 	ENCRYPTED_PLACEH = "******"
 )
@@ -32,14 +33,22 @@ var defaultFields []entryField = []entryField{
 
 type itemTable struct {
 	table.Model
-	styles  table.Styles
-	columns []table.Column
+	styles      table.Styles
+	stylesEmpty table.Styles
+	columns     []table.Column
 }
 
 func newItemTable(styles table.Styles, columns []table.Column, options ...table.Option) itemTable {
 	return itemTable{
-		Model:   table.New(append(options, table.WithStyles(styles))...),
-		styles:  styles,
+		Model:  table.New(append(options, table.WithStyles(styles))...),
+		styles: styles,
+		stylesEmpty: table.Styles{
+			Header: styles.Header,
+			Cell:   styles.Cell,
+			Selected: styles.Selected.Copy().
+				Foreground(styles.Cell.GetForeground()).
+				Bold(false),
+		},
 		columns: columns,
 	}
 }
@@ -103,24 +112,26 @@ func (t *itemTable) Load(d *parser.Document, path []int, lastSelected *map[strin
 		t.Clear()
 		return
 	}
-	if len(group.Groups) == 0 && len(group.Entries) == 0 {
-		t.SetRows([]table.Row{
-			{"(No entries)", ""},
-		})
-	} else {
-		t.LoadGroup(group, lastSelected)
-	}
+	t.LoadGroup(group, lastSelected)
 }
 
 func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]int) {
-	t.SetItems(group.Groups, group.Entries)
-
-	index, exists := (*lastSelected)[group.UUID]
-	if exists && index < len(t.Model.Rows()) {
-		t.SetCursor(index)
+	if len(group.Groups) == 0 && len(group.Entries) == 0 {
+		t.SetRows([]table.Row{
+			{GROUP_PLACEH, ""},
+		})
+		t.SetStyles(t.stylesEmpty)
 	} else {
-		t.SetCursor(0)
+		t.SetItems(group.Groups, group.Entries)
+		t.SetStyles(t.styles)
+		index, exists := (*lastSelected)[group.UUID]
+		if exists && index < len(t.Model.Rows()) {
+			t.SetCursor(index)
+		} else {
+			t.SetCursor(0)
+		}
 	}
+
 }
 
 func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
@@ -129,7 +140,7 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
 	}
 	for i, entry := range entries {
-		title := entry.TryGet("Title", "(No title)").Chardata
+		title := entry.TryGet("Title", TITLE_PLACEH).Chardata
 		rows[len(groups)+i] = table.Row{title, ""}
 	}
 	t.SetRows(rows)

@@ -83,11 +83,9 @@ func (n *Navigate) updateAll() {
 		n.parent.Clear()
 	} else {
 		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], &n.lastSelected)
-		//n.parent.SetCursor(n.path[len(n.path)-1])
 	}
 
 	n.selector.Load(n.database.Parsed(), n.path, &n.lastSelected)
-	//n.selector.SetCursor(0)
 
 	n.updatePreview()
 }
