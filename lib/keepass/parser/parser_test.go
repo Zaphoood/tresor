@@ -51,12 +51,17 @@ func TestParse(t *testing.T) {
 	}
 
 	path := []int{0, 3, 1}
-	groups, _, err := parsed.ListPath(path)
+	item, err := parsed.GetItem(path)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Groups at path %v:\n", path)
-	for _, group := range groups {
-		log.Printf(" * %s", group.Name)
+	group, ok := item.(Group)
+	if ok {
+		log.Printf("Groups at path %v:\n", path)
+		for _, g := range group.Groups {
+			log.Printf(" * %s", g.Name)
+		}
+	} else {
+		log.Printf("Not listing path since there is not group at path %v\n", path)
 	}
 }

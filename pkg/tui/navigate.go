@@ -119,18 +119,23 @@ func (n *Navigate) updatePreview() {
 }
 
 func updateTable(t *table.Model, d *parser.Document, path []int) {
-	groups, entries, err := d.ListPath(path)
+	item, err := d.GetItem(path)
 	if err != nil {
 		t.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
 	}
-	if len(groups)+len(entries) > 0 {
-		setItems(t, groups, entries)
-	} else {
+	group, ok := item.(parser.Group)
+	if !ok {
+		t.SetRows([]table.Row{})
+		return
+	}
+	if len(group.Groups) == 0 && len(group.Entries) == 0 {
 		t.SetRows([]table.Row{
 			{"(No entries)", ""},
 		})
+	} else {
+		setItems(t, group.Groups, group.Entries)
 	}
 }
 

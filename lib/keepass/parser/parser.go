@@ -2,6 +2,7 @@ package parser
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"time"
 
@@ -57,6 +58,8 @@ type Root struct {
 	//DeletedObjects
 }
 
+type Item interface{}
+
 type Group struct {
 	XMLName xml.Name `xml:"Group"`
 	Groups  []Group  `xml:"Group"`
@@ -71,6 +74,19 @@ type Group struct {
 	// EnableAutoType // bool?
 	//EnableSearching // bool?
 	LastTopVisibleEntry string
+}
+
+func (g *Group) At(index int) (Item, error) {
+	if index < 0 {
+		return nil, fmt.Errorf("Negative index: %d", index)
+	}
+	if index < len(g.Groups) {
+		return g.Groups[index], nil
+	}
+	if index - len(g.Groups) < len(g.Entries) {
+		return g.Entries[index - len(g.Groups)], nil
+	}
+	return nil, fmt.Errorf("Index out of range for group '%s': %d", g.Name, index)
 }
 
 type Entry struct {
@@ -152,43 +168,29 @@ func Parse(b []byte) (*Document, error) {
 }
 
 // ListPath returns subgroups and entries of a group specified by an array of indices. The document is traversed,
-// each level choosing the group with the current index, until the end of the path is reached.
-// An empty path will result in the top-level groups being returned
-func (d *Document) ListPath(path []int) ([]Group, []Entry, error) {
-	entries := []Entry{}
-	current := &d.Root.Groups
+// at each level choosing the group with the current index, until the end of the path is reached.
+// For an empty path the function will return the top-level groups (which is just one group for most KeePass files)
+func (d *Document) GetItem(path []int) (Item, error) {
+	current := Group{Groups: d.Root.Groups}
+
 	for i := 0; i < len(path); i++ {
-		if path[i] < 0 || path[i] >= len(*current) {
-			return []Group{}, []Entry{},
-				PathOutOfRange{fmt.Errorf("Path entry at position %d is out of range: %d >= %d", i, path[i], len(*current))}
+		next, err := current.At(path[i])
+		if err != nil {
+			return nil, PathOutOfRange(fmt.Errorf("Invalid path entry at position %d: %s", i, err))
 		}
-		if i == len(path)-1 {
-			entries = (*current)[path[i]].Entries
+		switch next := next.(type) {
+		case Group:
+			current = next
+		case Item:
+			if i == len(path) - 1 {
+				return next, nil
+			}
+			return nil, errors.New("Got Entry for non-final step in path")
+		default:
+			return nil, errors.New("Expected Group or Entry from Group.At()")
 		}
-		current = &(*current)[path[i]].Groups
 	}
-	return *current, entries, nil
+	return current, nil
 }
 
-func (d *Document) GetItem(path []int) (interface{}, error) {
-	groups, entries, err := d.ListPath(path[:len(path)-1])
-	if err != nil {
-		return nil, err
-	}
-	index := path[len(path)-1]
-	if index < len(groups) {
-		return groups[index], nil
-	} else if index < len(groups)+len(entries) {
-		return entries[index-len(groups)], nil
-	} else {
-		return nil, PathOutOfRange{fmt.Errorf("Item index out of range: %d", index)}
-	}
-}
-
-type PathOutOfRange struct {
-	err error
-}
-
-func (p PathOutOfRange) Error() string {
-	return p.err.Error()
-}
+type PathOutOfRange error
