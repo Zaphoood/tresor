@@ -14,10 +14,15 @@ import (
 
 /* Model for navigating the Database in order to view and edit entries */
 
+var itemViewColumns []sizedColumn = []sizedColumn{
+	{"Name", 0},
+	{"Entries", 7},
+}
+
 type Navigate struct {
-	parent   table.Model
-	selector table.Model
-	preview  table.Model
+	parent   itemTable
+	selector itemTable
+	preview  itemTable
 	styles   table.Styles
 	path     []int
 	err      error
@@ -28,11 +33,6 @@ type Navigate struct {
 	database *keepass.Database
 }
 
-var columnNames [2]string = [2]string{
-	"Name",
-	"Entries",
-}
-
 func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navigate {
 	n := Navigate{
 		styles:       table.DefaultStyles(),
@@ -41,9 +41,9 @@ func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navi
 		windowHeight: windowHeight,
 		database:     database,
 	}
-	n.parent = table.New(table.WithStyles(n.styles))
-	n.selector = table.New(table.WithStyles(n.styles), table.WithFocused(true))
-	n.preview = table.New(table.WithStyles(n.styles))
+	n.parent = newItemTable(n.styles, itemViewColumns)
+	n.selector = newItemTable(n.styles, itemViewColumns, table.WithFocused(true))
+	n.preview = newItemTable(n.styles, itemViewColumns)
 	n.resizeAll()
 	n.updateAll()
 
@@ -54,31 +54,24 @@ func (n *Navigate) resizeAll() {
 	selectorWidth := int(float64(n.windowWidth) * 0.3)
 	previewWidth := int(float64(n.windowWidth) * 0.5)
 	parentWidth := n.windowWidth - selectorWidth - previewWidth
+	height := n.windowHeight - 1
 
-	n.resizeTable(&n.parent, parentWidth)
-	n.resizeTable(&n.selector, selectorWidth)
-	n.resizeTable(&n.preview, previewWidth)
-}
-
-func (n *Navigate) resizeTable(t *table.Model, width int) {
-	t.SetWidth(width)
-	t.SetHeight(n.windowHeight - 1)
-	columns := []table.Column{
-		{Title: columnNames[0], Width: width - len(columnNames[1]) -
-			2*(n.styles.Header.GetPaddingLeft()+n.styles.Header.GetPaddingRight())},
-		{Title: columnNames[1], Width: len(columnNames[1])},
-	}
-	t.SetColumns(columns)
+	n.parent.SetSize(parentWidth, height)
+	n.selector.SetSize(selectorWidth, height)
+	n.preview.SetSize(previewWidth, height)
 }
 
 func (n *Navigate) updateAll() {
 	if len(n.path) == 0 {
-		n.parent.SetRows([]table.Row{})
+		n.parent.Clear()
 	} else {
-		updateTable(&n.parent, n.database.Parsed(), n.path[:len(n.path)-1])
+		//updateTable(&n.parent, n.database.Parsed(), n.path[:len(n.path)-1])
+		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1])
 		n.parent.SetCursor(n.path[len(n.path)-1])
 	}
-	updateTable(&n.selector, n.database.Parsed(), n.path)
+
+	//updateTable(&n.selector, n.database.Parsed(), n.path)
+	n.selector.Load(n.database.Parsed(), n.path)
 	n.selector.SetCursor(0)
 
 	n.updatePreview()
@@ -89,30 +82,27 @@ func (n *Navigate) updatePreview() {
 	// If a table is empty and the 'down' or 'up' key is pressed, the cursor becomes -1
 	// This may be a bug in Bubbles? Might also be intended
 	if cursor < 0 {
-		n.preview.SetRows([]table.Row{})
+		n.preview.Clear()
 		return
 	}
 	item, err := n.database.Parsed().GetItem(append(n.path, cursor))
 	if err != nil {
 		switch err := err.(type) {
 		case parser.PathOutOfRange:
-			n.preview.SetRows([]table.Row{
-				{"", ""},
-			})
+			n.preview.Clear()
 		default:
-			n.preview.SetRows([]table.Row{
-				{err.Error(), ""},
-			})
+			log.Printf("ERROR: %s\n", err)
 		}
 		return
 	}
 	switch item := item.(type) {
 	case parser.Group:
 		// A group is focused
-		setItems(&n.preview, item.Groups, item.Entries)
+		n.preview.setItems(item.Groups, item.Entries)
 	case parser.Entry:
 		// An entry is focused
-		n.loadEntry(&n.preview, item)
+		//n.loadEntry(&n.preview, item)
+		n.preview.Clear()
 	default:
 		log.Printf("ERROR: Expected Group or Entry in updatePreview")
 	}
@@ -207,6 +197,9 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cursor != n.selector.Cursor() {
 		n.updatePreview()
 	}
+
+	t := table.New()
+	t, cmd = t.Update(msg)
 
 	return n, cmd
 }

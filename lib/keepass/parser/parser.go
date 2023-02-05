@@ -83,8 +83,8 @@ func (g *Group) At(index int) (Item, error) {
 	if index < len(g.Groups) {
 		return g.Groups[index], nil
 	}
-	if index - len(g.Groups) < len(g.Entries) {
-		return g.Entries[index - len(g.Groups)], nil
+	if index-len(g.Groups) < len(g.Entries) {
+		return g.Entries[index-len(g.Groups)], nil
 	}
 	return nil, fmt.Errorf("Index out of range for group '%s': %d", g.Name, index)
 }
@@ -182,7 +182,7 @@ func (d *Document) GetItem(path []int) (Item, error) {
 		case Group:
 			current = next
 		case Item:
-			if i == len(path) - 1 {
+			if i == len(path)-1 {
 				return next, nil
 			}
 			return nil, errors.New("Got Entry for non-final step in path")
