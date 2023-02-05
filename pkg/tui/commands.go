@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	kp "github.com/Zaphoood/tresor/lib/keepass"
@@ -33,6 +34,17 @@ func decryptFileCmd(database *kp.Database, password string) tea.Cmd {
 		err := database.Decrypt(password)
 		if err != nil {
 			return decryptFailedMsg{err}
+		}
+		err = database.Parse()
+		if err != nil {
+			return decryptFailedMsg{err}
+		}
+		valid, err := database.VerifyHeaderHash()
+		if err != nil {
+			log.Println("Could not verify header hash")
+		}
+		if !valid {
+			return decryptFailedMsg{errors.New("Invalid header hash")}
 		}
 		return decryptDoneMsg{database}
 	}

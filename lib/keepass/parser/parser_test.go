@@ -38,8 +38,11 @@ func TestParse(t *testing.T) {
 	for _, group := range parsed.Root.Groups {
 		log.Printf(" * %s\n", group.Name)
 		for _, entry := range group.Entries {
-			title, err := entry.Get("Title")
-			if err != nil {
+			val, err := entry.Get("Title")
+			var title string
+			if err == nil {
+				title = val.Chardata
+			} else {
 				title = "(No title)"
 			}
 			log.Printf("   * %s (UUID: %s, history: %d)\n", title, entry.UUID, len(entry.History))
@@ -47,9 +50,21 @@ func TestParse(t *testing.T) {
 				log.Printf("     * %s (Protected: %t): %s \n",
 					str.Key, str.Value.IsProtected(), str.Value.Chardata)
 			}
-			//for _, str := range entry.Strings {
-			//	log.Printf("     * %s: %s\n", str.Key, str.Value)
-			//}
 		}
+	}
+
+	path := []int{0, 3, 1}
+	item, err := parsed.GetItem(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	group, ok := item.(Group)
+	if ok {
+		log.Printf("Groups at path %v:\n", path)
+		for _, g := range group.Groups {
+			log.Printf(" * %s", g.Name)
+		}
+	} else {
+		log.Printf("Not listing path since there is not group at path %v\n", path)
 	}
 }
