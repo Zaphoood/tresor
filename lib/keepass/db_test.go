@@ -22,28 +22,37 @@ func TestFileNotExist(t *testing.T) {
 func TestLoadDb(t *testing.T) {
 	assert := assert.New(t)
 
-	d := NewDatabase("./test/example.kdbx")
-	err := d.Load()
-	assert.Nil(err)
+	files := []struct {
+		path     string
+		password string
+	}{
+		{"./test/example_compressed.kdbx", "foo"},
+		{"./test/example.kdbx", "foo"},
+	}
+	for _, file := range files {
+		d := NewDatabase(file.path)
+		err := d.Load()
+		assert.Nil(err)
 
-	majorExpected, minorExpected := 3, 1
-	major, minor := d.Version()
-	assert.Equal(major, uint16(majorExpected), fmt.Sprintf("Expected major version: %d, actual: %d", major, majorExpected))
-	assert.Equal(minor, uint16(minorExpected), fmt.Sprintf("Expected minor version: %d, actual: %d", minor, minorExpected))
+		majorExpected, minorExpected := 3, 1
+		major, minor := d.Version()
+		assert.Equal(major, uint16(majorExpected), fmt.Sprintf("Expected major version: %d, actual: %d", major, majorExpected))
+		assert.Equal(minor, uint16(minorExpected), fmt.Sprintf("Expected minor version: %d, actual: %d", minor, minorExpected))
 
-	err = d.Decrypt("foo")
-	assert.Nil(err)
+		err = d.Decrypt(file.password)
+		assert.Nil(err)
 
-	plaintext := d.Plaintext()
-	assert.Equal(string(plaintext[:len(XML_HEADER)]), string(XML_HEADER))
-	assert.Equal(string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]), string(KEEPASS_END_TAG))
+		plaintext := d.Plaintext()
+		assert.Equal(string(plaintext[:len(XML_HEADER)]), string(XML_HEADER))
+		assert.Equal(string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]), string(KEEPASS_END_TAG))
 
-	err = d.Parse()
-	assert.Nil(err)
+		err = d.Parse()
+		assert.Nil(err)
 
-	valid, err := d.VerifyHeaderHash()
-	assert.Nil(err)
-	assert.True(valid, "Invalid header hash")
+		valid, err := d.VerifyHeaderHash()
+		assert.Nil(err)
+		assert.True(valid, "Invalid header hash")
+	}
 }
 
 func TestInvalidFileSignature(t *testing.T) {
@@ -62,13 +71,6 @@ func TestInvalidCipherID(t *testing.T) {
 	d := NewDatabase("./test/invalid_cipher_id.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for file with invalid cipher id, got nil")
-}
-
-func TestCompressed(t *testing.T) {
-	// Compression is not implemented yet, so we want to return an error for compressed databases
-	d := NewDatabase("./test/compressed.kdbx")
-	err := d.Load()
-	assert.NotNil(t, err, "Want error for compressed database, got nil")
 }
 
 func TestInvalidCiphertextLength(t *testing.T) {

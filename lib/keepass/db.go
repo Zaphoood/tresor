@@ -85,6 +85,7 @@ func validIRSID(id uint32) bool {
 }
 
 type databaseHeaders struct {
+	gzipCompression    bool
 	masterSeed         []byte
 	transformSeed      []byte
 	transformRounds    uint64
@@ -248,8 +249,13 @@ func (d *Database) Load() error {
 		return errors.New("Invalid or unsupported cipher")
 	}
 
-	if binary.LittleEndian.Uint32(headerMap[CompressionFlag]) != COMPRESSION_None {
-		return errors.New("Gzip-compressed databases are not supported yet, sorry :(")
+	switch flag := binary.LittleEndian.Uint32(headerMap[CompressionFlag]); flag {
+	case COMPRESSION_None:
+		d.headers.gzipCompression = false
+	case COMPRESSION_GZip:
+		d.headers.gzipCompression = true
+	default:
+		return fmt.Errorf("Unknown compression flag: %d", flag)
 	}
 
 	d.headers.masterSeed = headerMap[MasterSeed]
@@ -361,6 +367,14 @@ func (d *Database) Decrypt(password string) error {
 		block := blocks[uint32(id)]
 		copy(d.plaintext[pos:pos+block.length], plaintext[block.start:block.start+block.length])
 		pos += block.length
+	}
+
+	if d.headers.gzipCompression {
+		out, err := unzip(&d.plaintext)
+		d.plaintext = *out
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
