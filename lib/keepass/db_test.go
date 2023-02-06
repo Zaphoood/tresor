@@ -66,9 +66,12 @@ func TestInvalidCipherID(t *testing.T) {
 
 func TestCompressed(t *testing.T) {
 	// Compression is not implemented yet, so we want to return an error for compressed databases
-	d := NewDatabase("./test/compressed.kdbx")
+	d := NewDatabase("./test/example_compressed.kdbx")
 	err := d.Load()
-	assert.NotNil(t, err, "Want error for compressed database, got nil")
+	assert.Nil(t, err)
+
+	err = d.Decrypt("foo")
+	assert.Nil(t, err)
 }
 
 func TestInvalidCiphertextLength(t *testing.T) {
