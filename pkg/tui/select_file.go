@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -13,6 +14,11 @@ type SelectFile struct {
 	focusIndex int
 	input      textinput.Model
 	err        error
+
+	pathWithoutCompletion string
+	completions           []string
+	completionIndex       int
+	cyclingCompletions    bool
 
 	windowWidth  int
 	windowHeight int
@@ -48,25 +54,34 @@ func (m SelectFile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "tab", "shift+tab", "enter", "up", "down":
+		case "tab":
+			if !m.cyclingCompletions {
+				m.cyclingCompletions = true
+				err := m.loadCompletions()
+				if err != nil {
+					m.err = err
+				}
+				m.cycleCompletion(0)
+			} else {
+				m.cycleCompletion(1)
+			}
+		case "shift+tab":
+			if m.cyclingCompletions && len(m.completions) > 0 {
+				m.cycleCompletion(-1)
+			}
+		case "enter", "up", "down":
 			s := msg.String()
 
 			if s == "enter" {
 				return m, fileSelectedCmd(m.input.Value())
 			}
 
-			if s == "down" || s == "tab" {
+			if s == "down" {
 				m.focusIndex++
-			} else if s == "up" || s == "shift+tab" {
+			} else if s == "up" {
 				m.focusIndex--
 			}
-
-			if m.focusIndex > 1 {
-				m.focusIndex = 0
-			} else if m.focusIndex < 0 {
-				m.focusIndex = 1
-			}
-
+			m.focusIndex = mod(m.focusIndex, 2)
 			if m.focusIndex == 0 {
 				cmd = m.input.Focus()
 				return m, cmd
@@ -76,9 +91,44 @@ func (m SelectFile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+	oldValue := m.input.Value()
 	m.input, cmd = m.input.Update(msg)
+	if m.input.Value() != oldValue {
+		m.cyclingCompletions = false
+	}
 
 	return m, cmd
+}
+
+func (m *SelectFile) loadCompletions() error {
+	input := m.input.Value()
+	var err error
+	m.completions, err = completePath(input)
+	if err != nil {
+		return err
+	}
+	if input == "~" {
+		input = "~/"
+	}
+	m.pathWithoutCompletion = filepath.Dir(input)
+	return nil
+}
+
+func (m *SelectFile) cycleCompletion(n int) {
+	if n != 1 && n != 0 && n != -1 {
+		return
+	}
+	switch len(m.completions) {
+	case 0:
+		return
+	case 1:
+		m.cyclingCompletions = false
+		fallthrough
+	default:
+		m.completionIndex = mod(m.completionIndex+n, len(m.completions))
+		m.input.SetValue(joinRetainTrailingSep(m.pathWithoutCompletion, m.completions[m.completionIndex]))
+		m.input.SetCursor(len(m.input.Value()))
+	}
 }
 
 func (m SelectFile) View() string {
