@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -12,27 +14,22 @@ const (
 )
 
 func TestParse(t *testing.T) {
-	xmlFile, err := os.Open("../test/example_decrypted.xml")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert := assert.New(t)
 
+	xmlFile, err := os.Open("../test/example_decrypted.xml")
 	defer xmlFile.Close()
+	assert.Nil(err)
 
 	byteValue, _ := ioutil.ReadAll(xmlFile)
 
 	parsed, err := Parse(byteValue)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
 	log.Printf("Generator: %s\n", parsed.Meta.Generator)
 	log.Printf("HeaderHash: %s\n", parsed.Meta.HeaderHash)
 	log.Printf("Recycle Bin changed: %s\n", parsed.Meta.RecycleBinChanged.String())
 
-	if parsed.Meta.Generator != GENERATOR {
-		t.Fatalf("For Generator: want %s, got '%s'", GENERATOR, parsed.Meta.Generator)
-	}
+	assert.Equal(parsed.Meta.Generator, GENERATOR)
 
 	log.Printf("Groups (%d):\n", len(parsed.Root.Groups))
 	for _, group := range parsed.Root.Groups {
@@ -55,9 +52,7 @@ func TestParse(t *testing.T) {
 
 	path := []int{0, 3, 1}
 	item, err := parsed.GetItem(path)
-	if err != nil {
-		log.Fatal(err)
-	}
+	assert.Nil(err)
 	group, ok := item.(Group)
 	if ok {
 		log.Printf("Groups at path %v:\n", path)

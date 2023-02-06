@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBool(t *testing.T) {
@@ -24,23 +26,19 @@ func TestBool(t *testing.T) {
 		{input: "asdfas", expectError: true},
 	}
 
+	assert := assert.New(t)
+
 	for _, c := range cases {
 		r := root{}
 		err := xml.Unmarshal([]byte(fmt.Sprintf(template, c.input)), &r)
 		if c.expectError {
-			if err == nil {
-				t.Errorf("Expected error for input '%s', got nil", c.input)
-			}
+			assert.NotNil(err, fmt.Sprintf("Expected error for input '%s', got nil", c.input))
 		} else {
-			if !c.expectError && err != nil {
-				t.Errorf("Expected input '%s' to be valid, but got error: %s", c.input, err.Error())
-			}
-			if r.Bool.IsSet() != c.expectedIsSet {
-				t.Errorf("Expected tag's 'is set' to be %t, got %t", c.expectedIsSet, r.Bool.IsSet())
-			}
-			if r.Bool.Value() != c.expectedValue {
-				t.Errorf("Expected tag to have value %t, got %t", c.expectedValue, r.Bool.Value())
-			}
+			assert.Nil(err)
+			assert.Equal(r.Bool.IsSet(), c.expectedIsSet,
+				fmt.Sprintf("Expected tag's 'is set' to be %t, got %t", c.expectedIsSet, r.Bool.IsSet()))
+			assert.Equal(r.Bool.Value(), c.expectedValue,
+				fmt.Sprintf("Expected tag to have value %t, got %t", c.expectedValue, r.Bool.Value()))
 		}
 	}
 }
