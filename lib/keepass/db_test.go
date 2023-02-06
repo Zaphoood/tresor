@@ -1,10 +1,11 @@
 package keepass
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -15,110 +16,78 @@ var (
 func TestFileNotExist(t *testing.T) {
 	d := NewDatabase("/this/path/does/not/exist.kdbx")
 	err := d.Load()
-	if err == nil {
-		t.Error("Want error for non-existent path, got nil")
-	}
+	assert.NotNil(t, err, "Want error for non-existent path, got nil")
 }
 
 func TestLoadDb(t *testing.T) {
+	assert := assert.New(t)
+
 	d := NewDatabase("./test/example.kdbx")
 	err := d.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
-	expectedMajor := uint16(3)
-	expectedMinor := uint16(1)
-	if major, minor := d.Version(); major != expectedMajor || minor != expectedMinor {
-		t.Errorf("Want version to be %d.%d but got %d.%d", expectedMajor, expectedMinor, major, minor)
-	}
+	majorExpected, minorExpected := 3, 1
+	major, minor := d.Version()
+	assert.Equal(major, uint16(majorExpected), fmt.Sprintf("Expected major version: %d, actual: %d", major, majorExpected))
+	assert.Equal(minor, uint16(minorExpected), fmt.Sprintf("Expected minor version: %d, actual: %d", minor, minorExpected))
 
 	err = d.Decrypt("foo")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(err)
 
 	plaintext := d.Plaintext()
-	if !bytes.Equal(plaintext[:len(XML_HEADER)], XML_HEADER) {
-		t.Error(fmt.Sprintf("Expected XML header:\n%s\ngot:\n%s", XML_HEADER, plaintext[:len(XML_HEADER)]))
-	}
-	if !bytes.Equal(plaintext[len(plaintext)-len(KEEPASS_END_TAG):], KEEPASS_END_TAG) {
-		t.Error(fmt.Sprintf("Expected end tag to be:\n%s\ngot:\n%s", KEEPASS_END_TAG, plaintext[len(plaintext)-len(KEEPASS_END_TAG):]))
-	}
+	assert.Equal(string(plaintext[:len(XML_HEADER)]), string(XML_HEADER))
+	assert.Equal(string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]), string(KEEPASS_END_TAG))
 
 	err = d.Parse()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(err)
 
 	valid, err := d.VerifyHeaderHash()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !valid {
-		t.Error("Invalid header hash")
-	}
+	assert.Nil(err)
+	assert.True(valid, "Invalid header hash")
 }
 
 func TestInvalidFileSignature(t *testing.T) {
 	d := NewDatabase("./test/invalid_file_signature.kdbx")
 	err := d.Load()
-	if err == nil {
-		t.Fatal("Want error for file with invalid file signature, got nil")
-	}
+	assert.NotNil(t, err, "Want error for file with invalid file signature, got nil")
 }
 
 func TestInvalidVersionSignature(t *testing.T) {
 	d := NewDatabase("./test/invalid_version_signature.kdbx")
 	err := d.Load()
-	if err == nil {
-		t.Fatal("Want error for file with invalid version signature, got nil")
-	}
+	assert.NotNil(t, err, "Want error for file with invalid version signature, got nil")
 }
 
 func TestInvalidCipherID(t *testing.T) {
 	d := NewDatabase("./test/invalid_cipher_id.kdbx")
 	err := d.Load()
-	if err == nil {
-		t.Fatal("Want error for file with invalid cipher id, got nil")
-	}
+	assert.NotNil(t, err, "Want error for file with invalid cipher id, got nil")
 }
 
 func TestCompressed(t *testing.T) {
 	// Compression is not implemented yet, so we want to return an error for compressed databases
 	d := NewDatabase("./test/compressed.kdbx")
 	err := d.Load()
-	if err == nil {
-		t.Fatal("Want error for compressed database, got nil")
-	}
+	assert.NotNil(t, err, "Want error for compressed database, got nil")
 }
 
 func TestInvalidCiphertextLength(t *testing.T) {
 	d := NewDatabase("./test/invalid_length.kdbx")
-
 	err := d.Load()
-	if err == nil {
-		t.Fatal("Want error for invalid cipher text length, got nil")
-	}
+	assert.NotNil(t, err, "Want error for invalid cipher text length, got nil")
 }
 
 func TestInvalidStreamStartBytes(t *testing.T) {
 	d := NewDatabase("./test/invalid_ssb.kdbx")
 	err := d.Load()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(t, err)
 
 	err = d.Decrypt("foo")
-	if err == nil {
-		t.Fatal("Want error for invalid stream start bytes, got nil")
-	}
+	assert.NotNil(t, err, "Want error for invalid stream start bytes, got nil")
 }
 
 func TestTruncated(t *testing.T) {
 	d := NewDatabase("./test/truncated.kdbx")
 	err := d.Load()
-	if err != io.EOF {
-		t.Fatal("Want EOF for truncated file, got nil")
-	}
+	assert.Equal(t, err, io.EOF, "Want EOF for truncated file, got nil")
 }
