@@ -150,10 +150,6 @@ func (n *Navigate) rememberSelected() {
 	if currentGroup, ok := currentGroup.(parser.Group); err == nil && ok {
 		n.lastSelected[currentGroup.UUID] = n.selector.Cursor()
 	}
-	log.Println("----")
-	for key, value := range n.lastSelected {
-		log.Printf(" * %s: %d\n", key, value)
-	}
 }
 
 func (n Navigate) Init() tea.Cmd {

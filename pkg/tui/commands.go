@@ -15,13 +15,18 @@ func fileSelectedCmd(path string) tea.Cmd {
 		if len(path) == 0 {
 			return loadFailedMsg{errors.New("Empty path")}
 		}
-		if fileInfo, err := os.Stat(path); err != nil {
+		// Expand file path
+		pathExpanded, err := expand(path)
+		if err != nil {
+			return err
+		}
+		if fileInfo, err := os.Stat(pathExpanded); err != nil {
 			return loadFailedMsg{fmt.Errorf("File '%s' does not exist", path)}
 		} else if fileInfo.IsDir() {
 			return loadFailedMsg{fmt.Errorf("'%s' is directory", path)}
 		}
-		db := kp.NewDatabase(path)
-		err := db.Load()
+		db := kp.NewDatabase(pathExpanded)
+		err = db.Load()
 		if err != nil {
 			return loadFailedMsg{err}
 		}

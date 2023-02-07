@@ -136,12 +136,9 @@ func (d Database) Version() (uint16, uint16) {
 }
 
 func (d *Database) Load() error {
-	// Check if file exists
+	// Make sure file exists
 	_, err := os.Stat(d.path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("File '%s' does not exist", d.path)
-		}
 		return err
 	}
 
