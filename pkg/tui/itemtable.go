@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 
+	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -146,12 +147,12 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	t.SetRows(rows)
 }
 
-func (t *itemTable) LoadEntry(entry parser.Entry) {
+func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	rows := make([]table.Row, 0, len(entry.Strings))
 	visited := make(map[string]struct{})
+	var value string
 	for _, field := range defaultFields {
 		r := entry.TryGet(field.key, field.defaultValue)
-		var value string
 		if r.IsProtected() {
 			value = ENCRYPTED_PLACEH
 		} else {
@@ -165,10 +166,11 @@ func (t *itemTable) LoadEntry(entry parser.Entry) {
 			continue
 		}
 		if field.Value.IsProtected() {
-			rows = append(rows, table.Row{field.Key, ENCRYPTED_PLACEH})
+			value = ENCRYPTED_PLACEH
 		} else {
-			rows = append(rows, table.Row{field.Key, field.Value.Chardata})
+			value = field.Value.Chardata
 		}
+		rows = append(rows, table.Row{field.Key, value})
 	}
 	t.SetRows(rows)
 }

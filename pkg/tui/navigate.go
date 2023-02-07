@@ -9,9 +9,12 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.design/x/clipboard"
 )
 
 /* Model for navigating the Database in order to view and edit entries */
+
+const CLEAR_CLIPBOARD_DELAY = 10
 
 var itemViewColumns []table.Column = []table.Column{
 	{Title: "Name", Width: 0},
@@ -28,8 +31,7 @@ type Navigate struct {
 	selector     itemTable
 	groupPreview itemTable
 	entryPreview itemTable
-	// previewEntry is true when an Entry is focused, false when a Group is focused
-	previewEntry bool
+	focusedEntry *parser.Entry
 	lastSelected map[string]int
 	styles       table.Styles
 	path         []int
@@ -58,10 +60,15 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		Cell:     n.styles.Cell.Copy(),
 		Selected: lipgloss.NewStyle(),
 	}, entryViewColumns)
-	n.previewEntry = false
 
 	n.resizeAll()
 	n.updateAll()
+
+	err := clipboard.Init()
+	if err != nil {
+		// TODO: We should handle this more gracefully
+		panic(err)
+	}
 
 	return n
 }
@@ -112,11 +119,11 @@ func (n *Navigate) updatePreview() {
 	case parser.Group:
 		// A group is focused
 		n.groupPreview.LoadGroup(item, &n.lastSelected)
-		n.previewEntry = false
+		n.focusedEntry = nil
 	case parser.Entry:
 		// An entry is focused
-		n.entryPreview.LoadEntry(item)
-		n.previewEntry = true
+		n.entryPreview.LoadEntry(item, n.database)
+		n.focusedEntry = &item
 	default:
 		log.Printf("ERROR: Expected Group or Entry in updatePreview")
 	}
@@ -152,12 +159,22 @@ func (n *Navigate) rememberSelected() {
 	}
 }
 
+func (n *Navigate) copyToClipboard(value string) {
+	clipboard.Write(clipboard.FmtText, []byte(value))
+}
+
+func (n *Navigate) clearClipboard() {
+	clipboard.Write(clipboard.FmtText, []byte(""))
+}
+
 func (n Navigate) Init() tea.Cmd {
 	return nil
 }
 
 func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case clearClipboardMsg:
+		n.clearClipboard()
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
@@ -167,6 +184,16 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return n, tea.Quit
+		case "enter":
+			if n.focusedEntry != nil {
+				unlocked, err := n.database.Parsed().GetUnlocked(n.focusedEntry.UUID, "Password")
+				if err != nil {
+					log.Printf("Failed to get Password for '%s'\n", n.focusedEntry.UUID)
+					break
+				}
+				n.copyToClipboard(unlocked)
+				return n, scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY)
+			}
 		case "l":
 			n.moveRight()
 		case "h":
@@ -188,10 +215,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (n Navigate) View() string {
 	var preview string
-	if n.previewEntry {
-		preview = n.entryPreview.View()
-	} else {
+	if n.focusedEntry == nil {
 		preview = n.groupPreview.View()
+	} else {
+		preview = n.entryPreview.View()
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, n.parent.View(), n.selector.View(), preview)
 }

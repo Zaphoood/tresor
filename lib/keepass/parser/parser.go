@@ -251,6 +251,18 @@ func listProtected(node *xmlquery.Node) ([]field, error) {
 	return fields, nil
 }
 
+func (d *Document) GetUnlocked(uuid, key string) (string, error) {
+	if entry, exists := d.Unlocked[uuid]; exists {
+		value, err := entry.Get(key)
+		if err == nil {
+			return value.Chardata, nil
+		}
+		return "", err
+	} else {
+		return "", fmt.Errorf("No entry with UUID '%s' found in Unlocked", uuid)
+	}
+}
+
 // ListPath returns subgroups and entries of a group specified by an array of indices. The document is traversed,
 // at each level choosing the group with the current index, until the end of the path is reached.
 // For an empty path the function will return the top-level groups (which is just one group for most KeePass files)

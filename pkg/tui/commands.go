@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	database "github.com/Zaphoood/tresor/lib/keepass/database"
 	tea "github.com/charmbracelet/bubbletea"
@@ -70,6 +71,15 @@ type decryptDoneMsg struct {
 type decryptFailedMsg struct {
 	err error
 }
+
+func scheduleClearClipboard(delay int) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(time.Duration(delay) * time.Second)
+		return clearClipboardMsg{}
+	}
+}
+
+type clearClipboardMsg struct{}
 
 /* When any model receives a tea.WindowSizeMsg, it should emit this command
 in order to alert the main model of the resize. The main model will store the new
