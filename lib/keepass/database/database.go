@@ -3,7 +3,6 @@ package database
 import (
 	"bytes"
 	"crypto/aes"
-	"crypto/cipher"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -14,6 +13,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/Zaphoood/tresor/lib/keepass/crypto"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
 	"github.com/Zaphoood/tresor/lib/keepass/util"
 )
@@ -288,15 +288,9 @@ func (d *Database) Decrypt(password string) error {
 	compositeKey = sha256.Sum256(compositeKey[:])
 
 	// Generate master key
-	cfr, err := aes.NewCipher(d.headers.transformSeed)
+	transformOut, err := crypto.AESRounds(compositeKey[:], d.headers.transformSeed, d.headers.transformRounds)
 	if err != nil {
 		return err
-	}
-	transformOut := make([]byte, len(compositeKey))
-	copy(transformOut, compositeKey[:])
-	for i := uint64(0); i < d.headers.transformRounds; i++ {
-		cfr.Encrypt(transformOut[0:16], transformOut[0:16])
-		cfr.Encrypt(transformOut[16:32], transformOut[16:32])
 	}
 	transformKey := sha256.Sum256(transformOut)
 
@@ -306,13 +300,10 @@ func (d *Database) Decrypt(password string) error {
 	masterKey := h.Sum(nil)
 
 	// Decrypt content
-	cfr, err = aes.NewCipher(masterKey)
+	plaintext, err := crypto.DecryptAES(d.ciphertext, masterKey, d.headers.encryptionIV)
 	if err != nil {
 		return err
 	}
-	plaintext := make([]byte, len(d.ciphertext))
-	mode := cipher.NewCBCDecrypter(cfr, d.headers.encryptionIV)
-	mode.CryptBlocks(plaintext, d.ciphertext)
 
 	// Verify that decrypting was successful
 	if !bytes.Equal(d.headers.streamStartBytes, plaintext[:len(d.headers.streamStartBytes)]) {
