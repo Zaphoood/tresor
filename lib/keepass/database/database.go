@@ -1,4 +1,4 @@
-package keepass
+package database
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 	"sort"
 
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
+	"github.com/Zaphoood/tresor/lib/keepass/util"
 )
 
 const (
@@ -112,7 +113,7 @@ type Database struct {
 	parsed     *parser.Document
 }
 
-func NewDatabase(path string) Database {
+func New(path string) Database {
 	return Database{
 		path: path,
 	}
@@ -149,7 +150,7 @@ func (d *Database) Load() error {
 	}
 
 	// Check filetype signature
-	eq, err := readCompare(f, FILE_SIGNATURE[:])
+	eq, err := util.ReadCompare(f, FILE_SIGNATURE[:])
 	if err != nil {
 		return err
 	}
@@ -158,7 +159,7 @@ func (d *Database) Load() error {
 	}
 
 	// Check KeePass version signature
-	eq, err = readCompare(f, VERSION_SIGNATURE[:])
+	eq, err = util.ReadCompare(f, VERSION_SIGNATURE[:])
 	if err != nil {
 		return err
 	}
@@ -367,7 +368,7 @@ func (d *Database) Decrypt(password string) error {
 	}
 
 	if d.headers.gzipCompression {
-		out, err := unzip(&d.plaintext)
+		out, err := util.Unzip(&d.plaintext)
 		d.plaintext = *out
 		if err != nil {
 			return err

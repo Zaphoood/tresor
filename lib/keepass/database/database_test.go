@@ -1,4 +1,4 @@
-package keepass
+package database
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ var (
 )
 
 func TestFileNotExist(t *testing.T) {
-	d := NewDatabase("/this/path/does/not/exist.kdbx")
+	d := New("/this/path/does/not/exist.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for non-existent path, got nil")
 }
@@ -26,11 +26,11 @@ func TestLoadDb(t *testing.T) {
 		path     string
 		password string
 	}{
-		{"./test/example_compressed.kdbx", "foo"},
-		{"./test/example.kdbx", "foo"},
+		{"../test/example_compressed.kdbx", "foo"},
+		{"../test/example.kdbx", "foo"},
 	}
 	for _, file := range files {
-		d := NewDatabase(file.path)
+		d := New(file.path)
 		err := d.Load()
 		assert.Nil(err)
 
@@ -56,31 +56,31 @@ func TestLoadDb(t *testing.T) {
 }
 
 func TestInvalidFileSignature(t *testing.T) {
-	d := NewDatabase("./test/invalid_file_signature.kdbx")
+	d := New("../test/invalid_file_signature.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for file with invalid file signature, got nil")
 }
 
 func TestInvalidVersionSignature(t *testing.T) {
-	d := NewDatabase("./test/invalid_version_signature.kdbx")
+	d := New("../test/invalid_version_signature.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for file with invalid version signature, got nil")
 }
 
 func TestInvalidCipherID(t *testing.T) {
-	d := NewDatabase("./test/invalid_cipher_id.kdbx")
+	d := New("../test/invalid_cipher_id.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for file with invalid cipher id, got nil")
 }
 
 func TestInvalidCiphertextLength(t *testing.T) {
-	d := NewDatabase("./test/invalid_length.kdbx")
+	d := New("../test/invalid_length.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for invalid cipher text length, got nil")
 }
 
 func TestInvalidStreamStartBytes(t *testing.T) {
-	d := NewDatabase("./test/invalid_ssb.kdbx")
+	d := New("../test/invalid_ssb.kdbx")
 	err := d.Load()
 	assert.Nil(t, err)
 
@@ -89,7 +89,7 @@ func TestInvalidStreamStartBytes(t *testing.T) {
 }
 
 func TestTruncated(t *testing.T) {
-	d := NewDatabase("./test/truncated.kdbx")
+	d := New("../test/truncated.kdbx")
 	err := d.Load()
 	assert.Equal(t, io.EOF, err, "Want EOF for truncated file, got nil")
 }
