@@ -146,78 +146,24 @@ func (d *Database) Load() error {
 }
 
 func (d *Database) Decrypt(password string) error {
-	// Generate composite key
-	compositeKey := sha256.Sum256([]byte(password))
-	compositeKey = sha256.Sum256(compositeKey[:])
-
-	// Generate master key
-	transformOut, err := crypto.AESRounds(compositeKey[:], d.header.transformSeed, d.header.transformRounds)
+	masterKey, err := d.generateMasterKey(password)
 	if err != nil {
 		return err
 	}
-	transformKey := sha256.Sum256(transformOut)
 
-	h := sha256.New()
-	h.Write(d.header.masterSeed)
-	h.Write(transformKey[:])
-	masterKey := h.Sum(nil)
-
-	// Decrypt content
 	plaintext, err := crypto.DecryptAES(d.ciphertext, masterKey, d.header.encryptionIV)
 	if err != nil {
 		return err
 	}
 
-	// Verify that decrypting was successful
 	if !d.checkStreamStartBytes(&plaintext) {
+		// TODO: Create custom error for this
 		return errors.New("Wrong password")
 	}
 
-	blocks := make(map[uint32]block)
-	hashIndex := 0
-	totalSize := 0
-	i := 0
-	for i < len(plaintext) {
-		// Read block id
-		blockID := binary.LittleEndian.Uint32(plaintext[i : i+DWORD_LEN])
-		i += DWORD_LEN
-		if _, exists := blocks[blockID]; exists {
-			return fmt.Errorf("Duplicate block ID: %d", blockID)
-		}
-		// Store index of hash for later comparison
-		hashIndex = i
-		i += BLOCK_HASH_LEN
-
-		// Read block size
-		blockSize := int(binary.LittleEndian.Uint32(plaintext[i : i+DWORD_LEN]))
-		// Final block has block size 0
-		if blockSize == 0 {
-			break
-		}
-		i += DWORD_LEN
-
-		// Hash and compare
-		hash := sha256.Sum256(plaintext[i : i+blockSize])
-		if !bytes.Equal(hash[:], plaintext[hashIndex:hashIndex+BLOCK_HASH_LEN]) {
-			return errors.New("Block hash does not match. File may be corrupted")
-		}
-		blocks[blockID] = block{start: i, length: blockSize}
-		totalSize += blockSize
-		i += blockSize
-	}
-	// Concatenate blocks by order of their IDs
-	blockIDs := []int{}
-	for id := range blocks {
-		blockIDs = append(blockIDs, int(id))
-	}
-	sort.Ints(blockIDs)
-
-	d.plaintext = make([]byte, totalSize)
-	pos := 0
-	for _, id := range blockIDs {
-		block := blocks[uint32(id)]
-		copy(d.plaintext[pos:pos+block.length], plaintext[block.start:block.start+block.length])
-		pos += block.length
+	err = d.parseBlocks(&plaintext)
+	if err != nil {
+		return err
 	}
 
 	if d.header.gzipCompression {
@@ -231,10 +177,80 @@ func (d *Database) Decrypt(password string) error {
 	return nil
 }
 
+func (d *Database) generateMasterKey(password string) ([]byte, error) {
+	// Generate composite key
+	compositeKey := sha256.Sum256([]byte(password))
+	compositeKey = sha256.Sum256(compositeKey[:])
+
+	// Generate master key
+	transformOut, err := crypto.AESRounds(compositeKey[:], d.header.transformSeed, d.header.transformRounds)
+	if err != nil {
+		return nil, err
+	}
+	transformKey := sha256.Sum256(transformOut)
+
+	h := sha256.New()
+	h.Write(d.header.masterSeed)
+	h.Write(transformKey[:])
+	return h.Sum(nil), nil
+}
+
 func (d *Database) checkStreamStartBytes(plaintext *[]byte) bool {
 	ok := bytes.Equal(d.header.streamStartBytes, (*plaintext)[:len(d.header.streamStartBytes)])
 	*plaintext = (*plaintext)[len(d.header.streamStartBytes):]
 	return ok
+}
+
+func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
+	blocks := make(map[uint32]block)
+	hashIndex := 0
+	totalSize := 0
+	i := 0
+	for i < len((*plaintextBlocks)) {
+		// Read block id
+		blockID := binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD_LEN])
+		i += DWORD_LEN
+		if _, exists := blocks[blockID]; exists {
+			return fmt.Errorf("Duplicate block ID: %d", blockID)
+		}
+		// Store index of hash for later comparison
+		hashIndex = i
+		i += BLOCK_HASH_LEN
+
+		// Read block size
+		blockSize := int(binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD_LEN]))
+		// Final block has block size 0
+		if blockSize == 0 {
+			break
+		}
+		i += DWORD_LEN
+
+		// Hash and compare
+		hash := sha256.Sum256((*plaintextBlocks)[i : i+blockSize])
+		if !bytes.Equal(hash[:], (*plaintextBlocks)[hashIndex:hashIndex+BLOCK_HASH_LEN]) {
+			return errors.New("Block hash does not match. File may be corrupted")
+		}
+		blocks[blockID] = block{start: i, length: blockSize}
+		totalSize += blockSize
+		i += blockSize
+	}
+
+	// Concatenate blocks by order of their IDs
+	blockIDs := []int{}
+	for id := range blocks {
+		blockIDs = append(blockIDs, int(id))
+	}
+	sort.Ints(blockIDs)
+
+	d.plaintext = make([]byte, totalSize)
+	pos := 0
+	for _, id := range blockIDs {
+		block := blocks[uint32(id)]
+		copy(d.plaintext[pos:pos+block.length], (*plaintextBlocks)[block.start:block.start+block.length])
+		pos += block.length
+	}
+
+	return nil
 }
 
 func (d *Database) Parse() error {
