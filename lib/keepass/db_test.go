@@ -36,15 +36,15 @@ func TestLoadDb(t *testing.T) {
 
 		majorExpected, minorExpected := 3, 1
 		major, minor := d.Version()
-		assert.Equal(major, uint16(majorExpected), fmt.Sprintf("Expected major version: %d, actual: %d", major, majorExpected))
-		assert.Equal(minor, uint16(minorExpected), fmt.Sprintf("Expected minor version: %d, actual: %d", minor, minorExpected))
+		assert.Equal(uint16(majorExpected), major, fmt.Sprintf("Expected major version: %d, actual: %d", major, majorExpected))
+		assert.Equal(uint16(minorExpected), minor, fmt.Sprintf("Expected minor version: %d, actual: %d", minor, minorExpected))
 
 		err = d.Decrypt(file.password)
 		assert.Nil(err)
 
 		plaintext := d.Plaintext()
-		assert.Equal(string(plaintext[:len(XML_HEADER)]), string(XML_HEADER))
-		assert.Equal(string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]), string(KEEPASS_END_TAG))
+		assert.Equal(string(XML_HEADER), string(plaintext[:len(XML_HEADER)]))
+		assert.Equal(string(KEEPASS_END_TAG), string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]))
 
 		err = d.Parse()
 		assert.Nil(err)
@@ -91,5 +91,5 @@ func TestInvalidStreamStartBytes(t *testing.T) {
 func TestTruncated(t *testing.T) {
 	d := NewDatabase("./test/truncated.kdbx")
 	err := d.Load()
-	assert.Equal(t, err, io.EOF, "Want EOF for truncated file, got nil")
+	assert.Equal(t, io.EOF, err, "Want EOF for truncated file, got nil")
 }
