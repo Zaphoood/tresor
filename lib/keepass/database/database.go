@@ -33,7 +33,7 @@ type Database struct {
 	verMajor   uint16
 	verMinor   uint16
 	header     header
-	header_raw []byte // Store entire headers here; verify hash after decrypting
+	headerHash [32]byte
 
 	ciphertext []byte
 	plaintext  []byte
@@ -114,25 +114,23 @@ func (d *Database) Load() error {
 	d.verMinor = binary.LittleEndian.Uint16(bufMinor)
 	d.verMajor = binary.LittleEndian.Uint16(bufMajor)
 
-	// Read header
 	err = d.header.read(f)
 	if err != nil {
 		return err
 	}
 
-	// Store raw header content for hashing later
-	headersLength, err := f.Seek(0, 1)
+	headerLength, err := f.Seek(0, 1)
 	if err != nil {
 		return err
 	}
-	d.header_raw = make([]byte, headersLength)
+	headerRaw := make([]byte, headerLength)
 	_, err = f.Seek(0, 0)
 	if err != nil {
 		return err
 	}
-	f.Read(d.header_raw)
+	f.Read(headerRaw)
+	d.headerHash = sha256.Sum256(headerRaw)
 
-	// Read remaining file content
 	d.ciphertext, err = ioutil.ReadAll(f)
 	if err != nil {
 		return fmt.Errorf("Error while reading database content: %s", err)
@@ -265,16 +263,13 @@ func (d *Database) Parse() error {
 
 func (d *Database) VerifyHeaderHash() (bool, error) {
 	if len(d.parsed.Meta.HeaderHash) == 0 {
-		return false, errors.New("No header hash found")
+		return false, errors.New("No header hash found in XML")
 	}
 	storedHashEnc := []byte(d.parsed.Meta.HeaderHash)
 	storedHash := make([]byte, base64.StdEncoding.DecodedLen(len(storedHashEnc)))
-	_, err := base64.StdEncoding.Decode(storedHash, storedHashEnc)
+	length, err := base64.StdEncoding.Decode(storedHash, storedHashEnc)
 	if err != nil {
 		return false, err
 	}
-	actualHash := sha256.Sum256(d.header_raw)
-	// storedHash may be too long, since its length is taken from base64.StdEncoding.DecodedLen
-	// Therefore we only compare the first len(actualHash) bytes
-	return bytes.Equal(actualHash[:], storedHash[:len(actualHash)]), nil
+	return bytes.Equal(d.headerHash[:], storedHash[:length]), nil
 }
