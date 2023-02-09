@@ -34,10 +34,9 @@ func TestLoadDb(t *testing.T) {
 		err := d.Load()
 		assert.Nil(err)
 
-		majorExpected, minorExpected := 3, 1
-		major, minor := d.Version()
-		assert.Equal(uint16(majorExpected), major, fmt.Sprintf("Expected major version: %d, actual: %d", major, majorExpected))
-		assert.Equal(uint16(minorExpected), minor, fmt.Sprintf("Expected minor version: %d, actual: %d", minor, minorExpected))
+		expectedVersion := version{3, 1}
+		version := d.Version()
+		assert.Equal(expectedVersion, version, fmt.Sprintf("Expected version: %d, got: %d", expectedVersion, version))
 
 		err = d.Decrypt(file.password)
 		assert.Nil(err)

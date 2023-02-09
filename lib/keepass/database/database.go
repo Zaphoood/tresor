@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -28,10 +29,38 @@ type block struct {
 	length int
 }
 
+type version struct {
+	major uint16
+	minor uint16
+}
+
+func (v *version) read(r io.Reader) error {
+	buf := make([]byte, WORD)
+
+	read, err := r.Read(buf)
+	if err != nil {
+		return err
+	}
+	if read != len(buf) {
+		return errors.New("File truncated")
+	}
+	v.minor = binary.LittleEndian.Uint16(buf)
+
+	read, err = r.Read(buf)
+	if err != nil {
+		return err
+	}
+	if read != len(buf) {
+		return errors.New("File truncated")
+	}
+	v.major = binary.LittleEndian.Uint16(buf)
+
+	return nil
+}
+
 type Database struct {
 	path       string
-	verMajor   uint16
-	verMinor   uint16
+	version    version
 	header     header
 	headerHash [SHA256_DIGEST_LEN]byte
 
@@ -58,9 +87,8 @@ func (d Database) Parsed() *parser.Document {
 	return d.parsed
 }
 
-// Return kdbx version as tuple (major, minor)
-func (d Database) Version() (uint16, uint16) {
-	return d.verMajor, d.verMinor
+func (d Database) Version() version {
+	return d.version
 }
 
 func (d *Database) Load() error {
@@ -88,25 +116,10 @@ func (d *Database) Load() error {
 		return errors.New("Invalid or unsupported version signature")
 	}
 
-	// Read kdbx version
-	bufMinor := make([]byte, WORD)
-	bufMajor := make([]byte, WORD)
-	read, err := f.Read(bufMinor)
+	err = d.version.read(f)
 	if err != nil {
 		return err
 	}
-	if read != len(bufMinor) {
-		return errors.New("File truncated")
-	}
-	read, err = f.Read(bufMajor)
-	if err != nil {
-		return err
-	}
-	if read != len(bufMajor) {
-		return errors.New("File truncated")
-	}
-	d.verMinor = binary.LittleEndian.Uint16(bufMinor)
-	d.verMajor = binary.LittleEndian.Uint16(bufMajor)
 
 	err = d.header.read(f)
 	if err != nil {
