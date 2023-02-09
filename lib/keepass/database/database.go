@@ -260,7 +260,7 @@ func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
 
 func (d *Database) Parse() error {
 	var err error
-	d.parsed, err = parser.Parse(d.plaintext)
+	d.parsed, err = parser.Parse(d.plaintext, d.header.protectedStreamKey)
 	if err != nil {
 		return err
 	}

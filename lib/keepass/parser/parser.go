@@ -1,18 +1,28 @@
 package parser
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/Zaphoood/tresor/lib/keepass/crypto"
 	"github.com/Zaphoood/tresor/lib/keepass/parser/wrappers"
+	"github.com/antchfx/xmlquery"
 )
 
 type Document struct {
 	XMLName xml.Name `xml:"KeePassFile"`
 	Meta    Meta
 	Root    Root
+	// Values with inner stream encryption are stored here after decrypting
+	Unlocked map[string]Entry `xml:"-"`
+}
+
+func NewDocument() *Document {
+	return &Document{}
 }
 
 type Meta struct {
@@ -71,7 +81,7 @@ type Group struct {
 	Times      Times
 	IsExpanded wrappers.Bool
 	//DefaultAutoTypeSequence // string?
-	// EnableAutoType // bool?
+	//EnableAutoType // bool?
 	//EnableSearching // bool?
 	LastTopVisibleEntry string
 }
@@ -158,13 +168,87 @@ func (v *Value) IsProtected() bool {
 	return v.Protected == "True"
 }
 
-func Parse(b []byte) (*Document, error) {
-	p := Document{}
+func Parse(b []byte, key [32]byte) (*Document, error) {
+	p := NewDocument()
+	p.Unlock(b, key)
+
 	err := xml.Unmarshal(b, &p)
 	if err != nil {
 		return nil, err
 	}
-	return &p, nil
+	return p, nil
+}
+
+type field struct {
+	key   string
+	value string
+}
+
+// Unlock scans the XML for protected Values and stores their decrypted values in d.Unlocked
+func (d *Document) Unlock(b []byte, key [32]byte) error {
+	unlocked := make(map[string]Entry)
+	salsa := crypto.NewSalsa20Stream(key)
+
+	doc, err := xmlquery.Parse(bytes.NewReader(b))
+	if err != nil {
+		return err
+	}
+
+	for _, entryElement := range xmlquery.Find(doc, `//Group/Entry`) {
+		currentEntry, err := unlockEntry(entryElement, salsa)
+		if err != nil {
+			return err
+		}
+		if history := xmlquery.FindOne(entryElement, "/History"); history != nil {
+			for _, entryElementH := range xmlquery.Find(history, `/Entry`) {
+				currentEntryH, err := unlockEntry(entryElementH, salsa)
+				if err != nil {
+					return err
+				}
+				currentEntry.History = append(currentEntry.History, currentEntryH)
+			}
+		}
+		unlocked[currentEntry.UUID] = currentEntry
+	}
+	d.Unlocked = unlocked
+
+	return nil
+}
+
+func unlockEntry(entryElement *xmlquery.Node, salsa *crypto.Salsa20Stream) (Entry, error) {
+	entry := Entry{}
+	uuidElement := xmlquery.FindOne(entryElement, "//UUID")
+	if uuidElement == nil {
+		return Entry{}, fmt.Errorf("<Entry> element without a <UUID> element:\n%s\n", entryElement.OutputXML(true))
+	}
+	entry.UUID = uuidElement.InnerText()
+
+	protectedValues, err := listProtected(entryElement)
+	if err != nil {
+		return Entry{}, err
+	}
+	for _, protected := range protectedValues {
+		decoded, err := base64.StdEncoding.DecodeString(protected.value)
+		if err != nil {
+			return Entry{}, err
+		}
+		decrypted := salsa.Decrypt(decoded)
+		entry.Strings = append(entry.Strings, String{Key: protected.key, Value: Value{Chardata: string(decrypted)}})
+	}
+	return entry, nil
+}
+
+// listProtected returns all <Value> nodes with the Protected attribute set to 'True' as a list of fields
+func listProtected(node *xmlquery.Node) ([]field, error) {
+	fields := make([]field, 0)
+	for _, protected := range xmlquery.Find(node, "/String/Value[@Protected='True']") {
+		if keyNode := xmlquery.FindOne(protected.Parent, "//Key"); keyNode != nil {
+			fields = append(fields, field{key: keyNode.InnerText(), value: protected.InnerText()})
+		} else {
+			return nil, fmt.Errorf("String element without a <Key> element:\n%s\n", protected.OutputXML(true))
+		}
+	}
+	return fields, nil
 }
 
 // ListPath returns subgroups and entries of a group specified by an array of indices. The document is traversed,
