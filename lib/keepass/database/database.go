@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	VERSION_NUMBER_LEN = 2
-	BLOCK_HASH_LEN     = 32
-	DWORD_LEN          = 4
+	SHA256_DIGEST_LEN = 32
+	WORD              = 2
+	DWORD             = 4
 )
 
 type block struct {
@@ -33,7 +33,7 @@ type Database struct {
 	verMajor   uint16
 	verMinor   uint16
 	header     header
-	headerHash [32]byte
+	headerHash [SHA256_DIGEST_LEN]byte
 
 	ciphertext []byte
 	plaintext  []byte
@@ -64,12 +64,6 @@ func (d Database) Version() (uint16, uint16) {
 }
 
 func (d *Database) Load() error {
-	// Make sure file exists
-	_, err := os.Stat(d.path)
-	if err != nil {
-		return err
-	}
-
 	f, err := os.Open(d.path)
 	defer f.Close()
 	if err != nil {
@@ -95,8 +89,8 @@ func (d *Database) Load() error {
 	}
 
 	// Read kdbx version
-	bufMinor := make([]byte, VERSION_NUMBER_LEN)
-	bufMajor := make([]byte, VERSION_NUMBER_LEN)
+	bufMinor := make([]byte, WORD)
+	bufMajor := make([]byte, WORD)
 	read, err := f.Read(bufMinor)
 	if err != nil {
 		return err
@@ -206,26 +200,26 @@ func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
 	i := 0
 	for i < len((*plaintextBlocks)) {
 		// Read block id
-		blockID := binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD_LEN])
-		i += DWORD_LEN
+		blockID := binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD])
+		i += DWORD
 		if _, exists := blocks[blockID]; exists {
 			return fmt.Errorf("Duplicate block ID: %d", blockID)
 		}
 		// Store index of hash for later comparison
 		hashIndex = i
-		i += BLOCK_HASH_LEN
+		i += SHA256_DIGEST_LEN
 
 		// Read block size
-		blockSize := int(binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD_LEN]))
+		blockSize := int(binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD]))
 		// Final block has block size 0
 		if blockSize == 0 {
 			break
 		}
-		i += DWORD_LEN
+		i += DWORD
 
 		// Hash and compare
 		hash := sha256.Sum256((*plaintextBlocks)[i : i+blockSize])
-		if !bytes.Equal(hash[:], (*plaintextBlocks)[hashIndex:hashIndex+BLOCK_HASH_LEN]) {
+		if !bytes.Equal(hash[:], (*plaintextBlocks)[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
 			return errors.New("Block hash does not match. File may be corrupted")
 		}
 		blocks[blockID] = block{start: i, length: blockSize}
