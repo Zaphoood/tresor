@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"os"
 )
 
 // Read len(b) bytes from f and compare with b
-func ReadCompare(f *os.File, b []byte) (bool, error) {
+func ReadCompare(f io.Reader, b []byte) (bool, error) {
 	buf := make([]byte, len(b))
 	_, err := f.Read(buf)
 	if err != nil {
