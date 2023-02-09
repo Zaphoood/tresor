@@ -306,10 +306,9 @@ func (d *Database) Decrypt(password string) error {
 	}
 
 	// Verify that decrypting was successful
-	if !bytes.Equal(d.headers.streamStartBytes, plaintext[:len(d.headers.streamStartBytes)]) {
+	if !d.checkStreamStartBytes(&plaintext) {
 		return errors.New("Wrong password")
 	}
-	plaintext = plaintext[len(d.headers.streamStartBytes):]
 
 	blocks := make(map[uint32]block)
 	hashIndex := 0
@@ -367,6 +366,12 @@ func (d *Database) Decrypt(password string) error {
 	}
 
 	return nil
+}
+
+func (d *Database) checkStreamStartBytes(plaintext *[]byte) bool {
+	ok := bytes.Equal(d.headers.streamStartBytes, (*plaintext)[:len(d.headers.streamStartBytes)])
+	*plaintext = (*plaintext)[len(d.headers.streamStartBytes):]
+	return ok
 }
 
 func (d *Database) Parse() error {
