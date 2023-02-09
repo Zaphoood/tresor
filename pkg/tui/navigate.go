@@ -3,7 +3,7 @@ package tui
 import (
 	"log"
 
-	"github.com/Zaphoood/tresor/lib/keepass"
+	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -38,10 +38,10 @@ type Navigate struct {
 	windowWidth  int
 	windowHeight int
 
-	database *keepass.Database
+	database *database.Database
 }
 
-func NewNavigate(database *keepass.Database, windowWidth, windowHeight int) Navigate {
+func NewNavigate(database *database.Database, windowWidth, windowHeight int) Navigate {
 	n := Navigate{
 		styles:       table.DefaultStyles(),
 		path:         []int{0},

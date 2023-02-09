@@ -1,4 +1,4 @@
-package keepass
+package database
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ var (
 )
 
 func TestFileNotExist(t *testing.T) {
-	d := NewDatabase("/this/path/does/not/exist.kdbx")
+	d := New("/this/path/does/not/exist.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for non-existent path, got nil")
 }
@@ -26,25 +26,24 @@ func TestLoadDb(t *testing.T) {
 		path     string
 		password string
 	}{
-		{"./test/example_compressed.kdbx", "foo"},
-		{"./test/example.kdbx", "foo"},
+		{"../test/example_compressed.kdbx", "foo"},
+		{"../test/example.kdbx", "foo"},
 	}
 	for _, file := range files {
-		d := NewDatabase(file.path)
+		d := New(file.path)
 		err := d.Load()
 		assert.Nil(err)
 
-		majorExpected, minorExpected := 3, 1
-		major, minor := d.Version()
-		assert.Equal(major, uint16(majorExpected), fmt.Sprintf("Expected major version: %d, actual: %d", major, majorExpected))
-		assert.Equal(minor, uint16(minorExpected), fmt.Sprintf("Expected minor version: %d, actual: %d", minor, minorExpected))
+		expectedVersion := version{3, 1}
+		version := d.Version()
+		assert.Equal(expectedVersion, version, fmt.Sprintf("Expected version: %d, got: %d", expectedVersion, version))
 
 		err = d.Decrypt(file.password)
 		assert.Nil(err)
 
 		plaintext := d.Plaintext()
-		assert.Equal(string(plaintext[:len(XML_HEADER)]), string(XML_HEADER))
-		assert.Equal(string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]), string(KEEPASS_END_TAG))
+		assert.Equal(string(XML_HEADER), string(plaintext[:len(XML_HEADER)]))
+		assert.Equal(string(KEEPASS_END_TAG), string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]))
 
 		err = d.Parse()
 		assert.Nil(err)
@@ -56,31 +55,31 @@ func TestLoadDb(t *testing.T) {
 }
 
 func TestInvalidFileSignature(t *testing.T) {
-	d := NewDatabase("./test/invalid_file_signature.kdbx")
+	d := New("../test/invalid_file_signature.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for file with invalid file signature, got nil")
 }
 
 func TestInvalidVersionSignature(t *testing.T) {
-	d := NewDatabase("./test/invalid_version_signature.kdbx")
+	d := New("../test/invalid_version_signature.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for file with invalid version signature, got nil")
 }
 
 func TestInvalidCipherID(t *testing.T) {
-	d := NewDatabase("./test/invalid_cipher_id.kdbx")
+	d := New("../test/invalid_cipher_id.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for file with invalid cipher id, got nil")
 }
 
 func TestInvalidCiphertextLength(t *testing.T) {
-	d := NewDatabase("./test/invalid_length.kdbx")
+	d := New("../test/invalid_length.kdbx")
 	err := d.Load()
 	assert.NotNil(t, err, "Want error for invalid cipher text length, got nil")
 }
 
 func TestInvalidStreamStartBytes(t *testing.T) {
-	d := NewDatabase("./test/invalid_ssb.kdbx")
+	d := New("../test/invalid_ssb.kdbx")
 	err := d.Load()
 	assert.Nil(t, err)
 
@@ -89,7 +88,7 @@ func TestInvalidStreamStartBytes(t *testing.T) {
 }
 
 func TestTruncated(t *testing.T) {
-	d := NewDatabase("./test/truncated.kdbx")
+	d := New("../test/truncated.kdbx")
 	err := d.Load()
-	assert.Equal(t, err, io.EOF, "Want EOF for truncated file, got nil")
+	assert.Equal(t, io.EOF, err, "Want EOF for truncated file, got nil")
 }

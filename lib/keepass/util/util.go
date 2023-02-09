@@ -1,14 +1,13 @@
-package keepass
+package util
 
 import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"os"
 )
 
 // Read len(b) bytes from f and compare with b
-func readCompare(f *os.File, b []byte) (bool, error) {
+func ReadCompare(f io.Reader, b []byte) (bool, error) {
 	buf := make([]byte, len(b))
 	_, err := f.Read(buf)
 	if err != nil {
@@ -17,7 +16,7 @@ func readCompare(f *os.File, b []byte) (bool, error) {
 	return bytes.Equal(buf, b), nil
 }
 
-func unzip(in *[]byte) (*[]byte, error) {
+func Unzip(in *[]byte) (*[]byte, error) {
 	out := make([]byte, 1024)
 	var outBuf bytes.Buffer
 	inBuf := bytes.NewBuffer(*in)

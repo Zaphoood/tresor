@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	kp "github.com/Zaphoood/tresor/lib/keepass"
+	database "github.com/Zaphoood/tresor/lib/keepass/database"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -25,7 +25,7 @@ func fileSelectedCmd(path string) tea.Cmd {
 		} else if fileInfo.IsDir() {
 			return loadFailedMsg{fmt.Errorf("'%s' is directory", path)}
 		}
-		db := kp.NewDatabase(pathExpanded)
+		db := database.New(pathExpanded)
 		err = db.Load()
 		if err != nil {
 			return loadFailedMsg{err}
@@ -34,7 +34,7 @@ func fileSelectedCmd(path string) tea.Cmd {
 	}
 }
 
-func decryptFileCmd(database *kp.Database, password string) tea.Cmd {
+func decryptFileCmd(database *database.Database, password string) tea.Cmd {
 	return func() tea.Msg {
 		err := database.Decrypt(password)
 		if err != nil {
@@ -56,7 +56,7 @@ func decryptFileCmd(database *kp.Database, password string) tea.Cmd {
 }
 
 type loadDoneMsg struct {
-	database *kp.Database
+	database *database.Database
 }
 
 type loadFailedMsg struct {
@@ -64,7 +64,7 @@ type loadFailedMsg struct {
 }
 
 type decryptDoneMsg struct {
-	database *kp.Database
+	database *database.Database
 }
 
 type decryptFailedMsg struct {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	kp "github.com/Zaphoood/tresor/lib/keepass"
+	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -17,10 +17,10 @@ type Decrypt struct {
 	windowWidth  int
 	windowHeight int
 
-	database *kp.Database
+	database *database.Database
 }
 
-func NewDecrypt(database *kp.Database, windowWidth, windowHeight int) Decrypt {
+func NewDecrypt(database *database.Database, windowWidth, windowHeight int) Decrypt {
 	m := Decrypt{
 		input:        textinput.New(),
 		database:     database,
