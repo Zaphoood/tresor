@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/Zaphoood/tresor/pkg/tui"
 	"github.com/Zaphoood/tresor/pkg/util"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 	}
 	fmt.Println(path)
 
-	p := tea.NewProgram(tui.NewMainModel(), tea.WithAltScreen())
+	p := tea.NewProgram(tui.NewMainModel(path), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %s", err)
 		os.Exit(1)
