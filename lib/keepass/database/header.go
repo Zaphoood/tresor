@@ -100,14 +100,14 @@ func (h *header) read(stream io.Reader) error {
 			return err
 		}
 		if read != len(bufType) {
-			return errors.New("File truncated")
+			return FileError{errors.New("File truncated")}
 		}
 		read, err = stream.Read(bufLength)
 		if err != nil {
 			return err
 		}
 		if read != len(bufLength) {
-			return errors.New("File truncated")
+			return FileError{errors.New("File truncated")}
 		}
 		htype = headerCode(bufType[0])
 		length = binary.LittleEndian.Uint16(bufLength)
@@ -125,12 +125,12 @@ func (h *header) read(stream io.Reader) error {
 	// Parse headers
 	for _, h := range obligatoryFields {
 		if _, present := headerMap[h]; !present {
-			return fmt.Errorf("Missing header with code %d", h)
+			return FileError{fmt.Errorf("Missing header with code %d", h)}
 		}
 	}
 
 	if !bytes.Equal(headerMap[CipherID], AES_CIPHER_ID[:]) {
-		return errors.New("Invalid or unsupported cipher")
+		return FileError{errors.New("Invalid or unsupported cipher")}
 	}
 
 	switch flag := binary.LittleEndian.Uint32(headerMap[CompressionFlag]); flag {
@@ -139,7 +139,7 @@ func (h *header) read(stream io.Reader) error {
 	case COMPRESSION_GZip:
 		h.gzipCompression = true
 	default:
-		return fmt.Errorf("Unknown compression flag: %d", flag)
+		return FileError{fmt.Errorf("Unknown compression flag: %d", flag)}
 	}
 
 	h.masterSeed = headerMap[MasterSeed]
@@ -151,7 +151,7 @@ func (h *header) read(stream io.Reader) error {
 
 	irsid := binary.LittleEndian.Uint32(headerMap[InnerRandomStreamID])
 	if !validIRSID(irsid) {
-		return fmt.Errorf("Invalid Inner Random Stream ID: %d", irsid)
+		return FileError{fmt.Errorf("Invalid Inner Random Stream ID: %d", irsid)}
 	}
 	h.irs = IRSID(irsid)
 
