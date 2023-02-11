@@ -72,14 +72,19 @@ type decryptFailedMsg struct {
 	err error
 }
 
-func scheduleClearClipboard(delay int) tea.Cmd {
+func scheduleClearClipboard(delay int, timestamp time.Time) tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(time.Duration(delay) * time.Second)
-		return clearClipboardMsg{}
+		return clearClipboardMsg{timestamp}
 	}
 }
 
-type clearClipboardMsg struct{}
+type clearClipboardMsg struct {
+	// The timestamp allows identifying different clear clipboard messages
+	// This is useful when something is copied to the clipboard after another
+	// clipboard clearing has been scheduled but before it has been excecuted
+	timestamp time.Time
+}
 
 /* When any model receives a tea.WindowSizeMsg, it should emit this command
 in order to alert the main model of the resize. The main model will store the new

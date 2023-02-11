@@ -2,6 +2,7 @@ package tui
 
 import (
 	"log"
+	"time"
 
 	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
@@ -14,7 +15,7 @@ import (
 
 /* Model for navigating the Database in order to view and edit entries */
 
-const CLEAR_CLIPBOARD_DELAY = 10
+const CLEAR_CLIPBOARD_DELAY = 3
 
 var itemViewColumns []table.Column = []table.Column{
 	{Title: "Name", Width: 0},
@@ -33,10 +34,12 @@ type Navigate struct {
 	entryPreview itemTable
 	focusedEntry *parser.Entry
 	lastSelected map[string]int
-	styles       table.Styles
-	path         []int
-	err          error
 
+	lastCopy time.Time
+	path     []int
+	err      error
+
+	styles       table.Styles
 	windowWidth  int
 	windowHeight int
 
@@ -159,12 +162,26 @@ func (n *Navigate) rememberSelected() {
 	}
 }
 
-func (n *Navigate) copyToClipboard(value string) {
-	clipboard.Write(clipboard.FmtText, []byte(value))
+func (n *Navigate) copyToClipboard() tea.Cmd {
+	if n.focusedEntry == nil {
+		return nil
+	}
+	unlocked, err := n.database.Parsed().GetUnlocked(n.focusedEntry.UUID, "Password")
+	if err != nil {
+		log.Printf("Failed to get Password for '%s'\n", n.focusedEntry.UUID)
+		return nil
+	}
+	clipboard.Write(clipboard.FmtText, []byte(unlocked))
+
+	timestamp := time.Now()
+	n.lastCopy = timestamp
+	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, timestamp)
 }
 
-func (n *Navigate) clearClipboard() {
-	clipboard.Write(clipboard.FmtText, []byte(""))
+func (n *Navigate) clearClipboard(timestamp time.Time) {
+	if n.lastCopy == timestamp {
+		clipboard.Write(clipboard.FmtText, []byte(""))
+	}
 }
 
 func (n Navigate) Init() tea.Cmd {
@@ -174,7 +191,7 @@ func (n Navigate) Init() tea.Cmd {
 func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case clearClipboardMsg:
-		n.clearClipboard()
+		n.clearClipboard(msg.timestamp)
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
@@ -185,15 +202,8 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return n, tea.Quit
 		case "enter":
-			if n.focusedEntry != nil {
-				unlocked, err := n.database.Parsed().GetUnlocked(n.focusedEntry.UUID, "Password")
-				if err != nil {
-					log.Printf("Failed to get Password for '%s'\n", n.focusedEntry.UUID)
-					break
-				}
-				n.copyToClipboard(unlocked)
-				return n, scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY)
-			}
+			cmd := n.copyToClipboard()
+			return n, cmd
 		case "l":
 			n.moveRight()
 		case "h":
