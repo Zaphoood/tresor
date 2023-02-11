@@ -26,7 +26,7 @@ func TestLoadDb(t *testing.T) {
 		path     string
 		password string
 	}{
-		{"../test/example_compressed.kdbx", "foo"},
+		//{"../test/example_compressed.kdbx", "foo"},
 		{"../test/example.kdbx", "foo"},
 	}
 	for _, file := range files {

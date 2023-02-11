@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -79,7 +80,7 @@ type header struct {
 	transformSeed      []byte
 	transformRounds    uint64
 	encryptionIV       []byte
-	protectedStreamKey []byte
+	protectedStreamKey [32]byte
 	streamStartBytes   []byte
 	irs                IRSID
 }
@@ -145,7 +146,7 @@ func (h *header) read(stream io.Reader) error {
 	h.transformSeed = headerMap[TransformSeed]
 	h.transformRounds = binary.LittleEndian.Uint64(headerMap[TransformRounds])
 	h.encryptionIV = headerMap[EncryptionIV]
-	h.protectedStreamKey = headerMap[ProtectedStreamKey]
+	h.protectedStreamKey = sha256.Sum256(headerMap[ProtectedStreamKey])
 	h.streamStartBytes = headerMap[StreamStartBytes]
 
 	irsid := binary.LittleEndian.Uint32(headerMap[InnerRandomStreamID])

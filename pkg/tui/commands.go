@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	database "github.com/Zaphoood/tresor/lib/keepass/database"
 	tea "github.com/charmbracelet/bubbletea"
@@ -69,6 +70,20 @@ type decryptDoneMsg struct {
 
 type decryptFailedMsg struct {
 	err error
+}
+
+func scheduleClearClipboard(delay int, timestamp time.Time) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(time.Duration(delay) * time.Second)
+		return clearClipboardMsg{timestamp}
+	}
+}
+
+type clearClipboardMsg struct {
+	// The timestamp allows identifying different clear clipboard messages
+	// This is useful when something is copied to the clipboard after another
+	// clipboard clearing has been scheduled but before it has been excecuted
+	timestamp time.Time
 }
 
 /* When any model receives a tea.WindowSizeMsg, it should emit this command
