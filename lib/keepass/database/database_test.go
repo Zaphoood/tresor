@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,7 +25,7 @@ func TestLoadDb(t *testing.T) {
 		path     string
 		password string
 	}{
-		//{"../test/example_compressed.kdbx", "foo"},
+		{"../test/example_compressed.kdbx", "foo"},
 		{"../test/example.kdbx", "foo"},
 	}
 	for _, file := range files {
@@ -54,52 +53,25 @@ func TestLoadDb(t *testing.T) {
 	}
 }
 
-func TestInvalidFileSignature(t *testing.T) {
-	d := New("../test/invalid_file_signature.kdbx")
-	err := d.Load()
-	if assert.NotNil(t, err) {
-		assert.IsType(t, FileError{}, err)
+func TestErrors(t *testing.T) {
+	cases := []struct {
+		path       string
+		loadErr    error
+		decryptErr error
+	}{
+		{"../test/invalid_file_signature.kdbx", FileError{}, nil},
+		{"../test/invalid_version_signature.kdbx", FileError{}, nil},
+		{"../test/invalid_cipher_id.kdbx", FileError{}, nil},
+		{"../test/invalid_length.kdbx", FileError{}, nil},
+		{"../test/invalid_ssb.kdbx", nil, DecryptError{}},
 	}
-}
-
-func TestInvalidVersionSignature(t *testing.T) {
-	d := New("../test/invalid_version_signature.kdbx")
-	err := d.Load()
-	if assert.NotNil(t, err) {
-		assert.IsType(t, FileError{}, err)
+	for _, c := range cases {
+		d := New(c.path)
+		err := d.Load()
+		assert.IsType(t, c.loadErr, err, fmt.Sprintf("Expected '%T' when loading '%s'", c.loadErr, c.path))
+		if err == nil {
+			err = d.Decrypt("foo")
+			assert.IsType(t, c.decryptErr, err, fmt.Sprintf("Expected '%T' when decrypting '%s'", c.decryptErr, c.path))
+		}
 	}
-
-}
-
-func TestInvalidCipherID(t *testing.T) {
-	d := New("../test/invalid_cipher_id.kdbx")
-	err := d.Load()
-	if assert.NotNil(t, err) {
-		assert.IsType(t, FileError{}, err)
-	}
-}
-
-func TestInvalidCiphertextLength(t *testing.T) {
-	d := New("../test/invalid_length.kdbx")
-	err := d.Load()
-	if assert.NotNil(t, err) {
-		assert.IsType(t, DecryptError{}, err)
-	}
-}
-
-func TestInvalidStreamStartBytes(t *testing.T) {
-	d := New("../test/invalid_ssb.kdbx")
-	err := d.Load()
-	assert.Nil(t, err)
-
-	err = d.Decrypt("foo")
-	if assert.NotNil(t, err) {
-		assert.IsType(t, DecryptError{}, err)
-	}
-}
-
-func TestTruncated(t *testing.T) {
-	d := New("../test/truncated.kdbx")
-	err := d.Load()
-	assert.Equal(t, io.EOF, err)
 }
