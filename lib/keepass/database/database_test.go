@@ -57,25 +57,34 @@ func TestLoadDb(t *testing.T) {
 func TestInvalidFileSignature(t *testing.T) {
 	d := New("../test/invalid_file_signature.kdbx")
 	err := d.Load()
-	assert.NotNil(t, err, "Want error for file with invalid file signature, got nil")
+	if assert.NotNil(t, err) {
+		assert.IsType(t, FileError{}, err)
+	}
 }
 
 func TestInvalidVersionSignature(t *testing.T) {
 	d := New("../test/invalid_version_signature.kdbx")
 	err := d.Load()
-	assert.NotNil(t, err, "Want error for file with invalid version signature, got nil")
+	if assert.NotNil(t, err) {
+		assert.IsType(t, FileError{}, err)
+	}
+
 }
 
 func TestInvalidCipherID(t *testing.T) {
 	d := New("../test/invalid_cipher_id.kdbx")
 	err := d.Load()
-	assert.NotNil(t, err, "Want error for file with invalid cipher id, got nil")
+	if assert.NotNil(t, err) {
+		assert.IsType(t, FileError{}, err)
+	}
 }
 
 func TestInvalidCiphertextLength(t *testing.T) {
 	d := New("../test/invalid_length.kdbx")
 	err := d.Load()
-	assert.NotNil(t, err, "Want error for invalid cipher text length, got nil")
+	if assert.NotNil(t, err) {
+		assert.IsType(t, DecryptError{}, err)
+	}
 }
 
 func TestInvalidStreamStartBytes(t *testing.T) {
@@ -84,11 +93,13 @@ func TestInvalidStreamStartBytes(t *testing.T) {
 	assert.Nil(t, err)
 
 	err = d.Decrypt("foo")
-	assert.NotNil(t, err, "Want error for invalid stream start bytes, got nil")
+	if assert.NotNil(t, err) {
+		assert.IsType(t, DecryptError{}, err)
+	}
 }
 
 func TestTruncated(t *testing.T) {
 	d := New("../test/truncated.kdbx")
 	err := d.Load()
-	assert.Equal(t, io.EOF, err, "Want EOF for truncated file, got nil")
+	assert.Equal(t, io.EOF, err)
 }

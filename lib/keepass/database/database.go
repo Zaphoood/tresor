@@ -58,6 +58,38 @@ func (v *version) read(r io.Reader) error {
 	return nil
 }
 
+type FileError struct {
+	err error
+}
+
+func (e FileError) Error() string {
+	return e.err.Error()
+}
+
+type ParseError struct {
+	err error
+}
+
+func (e ParseError) Error() string {
+	return e.err.Error()
+}
+
+type DecryptError struct {
+	err error
+}
+
+func (e DecryptError) Error() string {
+	return e.err.Error()
+}
+
+type BlockSizeError struct {
+	expectedBlockSize int
+}
+
+func (e BlockSizeError) Error() string {
+	return fmt.Sprintf("Invalid cipher text: length must be multiple of block size %d", e.expectedBlockSize)
+}
+
 type Database struct {
 	path       string
 	version    version
@@ -104,7 +136,7 @@ func (d *Database) Load() error {
 		return err
 	}
 	if !eq {
-		return errors.New("Invalid file signature")
+		return FileError{errors.New("Invalid file signature")}
 	}
 
 	// Check KeePass version signature
@@ -113,7 +145,7 @@ func (d *Database) Load() error {
 		return err
 	}
 	if !eq {
-		return errors.New("Invalid or unsupported version signature")
+		return FileError{errors.New("Invalid or unsupported version signature")}
 	}
 
 	err = d.version.read(f)
@@ -140,11 +172,11 @@ func (d *Database) Load() error {
 
 	d.ciphertext, err = ioutil.ReadAll(f)
 	if err != nil {
-		return fmt.Errorf("Error while reading database content: %s", err)
+		return FileError{fmt.Errorf("Error while reading database content: %s", err)}
 	}
 
 	if len(d.ciphertext)%aes.BlockSize != 0 {
-		return fmt.Errorf("Invalid cipher text: length must be multiple of block size %d", aes.BlockSize)
+		return FileError{BlockSizeError{aes.BlockSize}}
 	}
 
 	return nil
@@ -162,8 +194,7 @@ func (d *Database) Decrypt(password string) error {
 	}
 
 	if !d.checkStreamStartBytes(&plaintext) {
-		// TODO: Create custom error for this
-		return errors.New("Wrong password")
+		return DecryptError{errors.New("Wrong password")}
 	}
 
 	err = d.parseBlocks(&plaintext)
@@ -216,7 +247,7 @@ func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
 		blockID := binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD])
 		i += DWORD
 		if _, exists := blocks[blockID]; exists {
-			return fmt.Errorf("Duplicate block ID: %d", blockID)
+			return ParseError{fmt.Errorf("Duplicate block ID: %d", blockID)}
 		}
 		// Store index of hash for later comparison
 		hashIndex = i
@@ -233,7 +264,7 @@ func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
 		// Hash and compare
 		hash := sha256.Sum256((*plaintextBlocks)[i : i+blockSize])
 		if !bytes.Equal(hash[:], (*plaintextBlocks)[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
-			return errors.New("Block hash does not match. File may be corrupted")
+			return ParseError{errors.New("Block hash does not match. File may be corrupted")}
 		}
 		blocks[blockID] = block{start: i, length: blockSize}
 		totalSize += blockSize
