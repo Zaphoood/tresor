@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/Zaphoood/tresor/pkg/tui"
-	tea "github.com/charmbracelet/bubbletea"
 	"os"
+
+	"github.com/Zaphoood/tresor/pkg/tui"
+	"github.com/Zaphoood/tresor/pkg/util"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
@@ -15,7 +17,14 @@ func main() {
 	}
 	defer f.Close()
 
-	p := tea.NewProgram(tui.NewMainModel(), tea.WithAltScreen())
+	path, err := util.ParseCommandLineArgs(os.Args)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(path)
+
+	p := tea.NewProgram(tui.NewMainModel(path), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %s", err)
 		os.Exit(1)

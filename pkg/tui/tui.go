@@ -20,16 +20,22 @@ type MainModel struct {
 	selectFile tea.Model
 	decrypt    tea.Model
 	navigate   tea.Model
+	// Instead of asking the user for input, the path can be set upon construction
+	// This is useful for passing command line arguments
+	forcePath string
 
 	windowWidth  int
 	windowHeight int
 }
 
-func NewMainModel() MainModel {
-	return MainModel{view: selectFileView, selectFile: NewSelectFile()}
+func NewMainModel(path string) MainModel {
+	return MainModel{view: selectFileView, selectFile: NewSelectFile(), forcePath: path}
 }
 
 func (m MainModel) Init() tea.Cmd {
+	if len(m.forcePath) > 0 {
+		return fileSelectedCmd(m.forcePath)
+	}
 	return nil
 }
 
@@ -38,6 +44,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.windowWidth = msg.Width
+		m.windowHeight = msg.Height
 	case loadDoneMsg:
 		m.view = decryptView
 		m.decrypt = NewDecrypt(msg.database, m.windowWidth, m.windowHeight)
