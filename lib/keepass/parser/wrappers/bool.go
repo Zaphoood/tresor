@@ -3,6 +3,7 @@ package wrappers
 import (
 	"encoding/xml"
 	"fmt"
+	"strings"
 )
 
 // Bool represents a tag that contains either "True" or "False" as its chardata
@@ -38,14 +39,17 @@ func (b *Bool) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	if charData == nil {
 		return fmt.Errorf("Failed to unmarshal element '%s' as literal bool: empty element", start.Name.Local)
 	}
-	switch string(charData) {
-	case "True":
+	switch strings.ToLower(string(charData)) {
+	case "true":
 		b.isSet = true
 		b.value = true
 		return nil
-	case "False":
+	case "false":
 		b.isSet = true
 		b.value = false
+		return nil
+	case "null":
+		b.isSet = false
 		return nil
 	default:
 		return fmt.Errorf("Failed to unmarshal element '%s' as literal bool. Want 'True' or 'False', got '%s'", start.Name.Local, charData)
