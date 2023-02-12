@@ -11,7 +11,7 @@ import (
 
 const (
 	GENERATOR            = "KeePass"
-	PROTECTED_STREAM_KEY = "110f7392171a714fb4a7684c6f829a01d9eccb6a5089376eca23fe3bf4875a4c"
+	PROTECTED_STREAM_KEY = "be3723cc9496ac62a51976df67314e68203140178c1aba143ce6c2441f1068f4"
 )
 
 func TestParse(t *testing.T) {
