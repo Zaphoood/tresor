@@ -42,6 +42,7 @@ type Meta struct {
 	MasterKeyChangeForce       int
 	MemoryProtection           MemoryProtection
 	RecycleBinEnabled          wrappers.Bool
+	RecycleBinUUID             string
 	RecycleBinChanged          time.Time
 	EntryTemplatesGroup        string
 	EntryTemplatesGroupChanged time.Time
@@ -49,8 +50,18 @@ type Meta struct {
 	HistoryMaxSize             int
 	LastSelectedGroup          string
 	LastTopVisibleGroup        string
-	//Binaries
-	//CustomData
+	Binaries                   []Binary `xml:"Binaries>Binary"`
+	CustomData                 CustomData
+}
+
+type CustomData struct {
+	Inner string `xml:",innerxml"`
+}
+
+type Binary struct {
+	XMLName  xml.Name `xml:"Binary"`
+	ID       int      `xml:"ID,attr"`
+	Chardata string   `xml:",chardata"`
 }
 
 type MemoryProtection struct {
@@ -63,9 +74,14 @@ type MemoryProtection struct {
 }
 
 type Root struct {
-	XMLName xml.Name `xml:"Root"`
-	Groups  []Group  `xml:"Group"`
-	//DeletedObjects
+	XMLName        xml.Name        `xml:"Root"`
+	Groups         []Group         `xml:"Group"`
+	DeletedObjects []DeletedObject `xml:"DeletedObjects>DeletedObject"`
+}
+
+type DeletedObject struct {
+	UUID         string
+	DeletionTime time.Time
 }
 
 type Item interface{}
@@ -75,15 +91,15 @@ type Group struct {
 	Groups  []Group  `xml:"Group"`
 	Entries []Entry  `xml:"Entry"`
 
-	UUID       string
-	Name       string
-	IconID     int
-	Times      Times
-	IsExpanded wrappers.Bool
-	//DefaultAutoTypeSequence // string?
-	//EnableAutoType // bool?
-	//EnableSearching // bool?
-	LastTopVisibleEntry string
+	UUID                    string
+	Name                    string
+	IconID                  int
+	Times                   Times
+	IsExpanded              wrappers.Bool
+	DefaultAutoTypeSequence string
+	EnableAutoType          wrappers.Bool
+	EnableSearching         wrappers.Bool
+	LastTopVisibleEntry     string
 }
 
 func (g *Group) At(index int) (Item, error) {
@@ -109,9 +125,10 @@ type Entry struct {
 	OverrideURL     string
 	Tags            string
 	Times           Times
+	Strings         []String          `xml:"String"`
+	BinaryRefs      []BinaryReference `xml:"Binary"`
 	AutoType        AutoType
-	Strings         []String `xml:"String"`
-	History         []Entry  `xml:"History>Entry"`
+	History         []Entry `xml:"History>Entry"`
 }
 
 type Times struct {
@@ -122,6 +139,15 @@ type Times struct {
 	Expires              wrappers.Bool
 	UsageCount           int
 	LocationChanged      time.Time
+}
+
+type BinaryReference struct {
+	Key       string
+	Reference BinaryReferenceValue `xml:"Value"`
+}
+
+type BinaryReferenceValue struct {
+	ID int `xml:"Ref,attr"`
 }
 
 type AutoType struct {
@@ -287,6 +313,19 @@ func (d *Document) GetItem(path []int) (Item, error) {
 		}
 	}
 	return current, nil
+}
+
+func (d *Document) GetBinary(id int) ([]byte, error) {
+	for _, binary := range d.Meta.Binaries {
+		if binary.ID == id {
+			decoded, err := base64.StdEncoding.DecodeString(binary.Chardata)
+			if err != nil {
+				return []byte{}, err
+			}
+			return decoded, nil
+		}
+	}
+	return []byte{}, fmt.Errorf("No binary with ID: %d", id)
 }
 
 type PathOutOfRange error

@@ -21,7 +21,11 @@ func TestBool(t *testing.T) {
 		expectedValue bool
 	}{
 		{input: "True", expectError: false, expectedIsSet: true, expectedValue: true},
+		{input: "true", expectError: false, expectedIsSet: true, expectedValue: true},
 		{input: "False", expectError: false, expectedIsSet: true, expectedValue: false},
+		{input: "false", expectError: false, expectedIsSet: true, expectedValue: false},
+		{input: "null", expectError: false, expectedIsSet: false},
+		{input: "nUlL", expectError: false, expectedIsSet: false},
 		{input: "", expectError: true},
 		{input: "asdfas", expectError: true},
 	}
@@ -37,8 +41,10 @@ func TestBool(t *testing.T) {
 			assert.Nil(err)
 			assert.Equal(r.Bool.IsSet(), c.expectedIsSet,
 				fmt.Sprintf("Expected tag's 'is set' to be %t, got %t", c.expectedIsSet, r.Bool.IsSet()))
-			assert.Equal(r.Bool.Value(), c.expectedValue,
-				fmt.Sprintf("Expected tag to have value %t, got %t", c.expectedValue, r.Bool.Value()))
+			if c.expectedIsSet {
+				assert.Equal(r.Bool.Value(), c.expectedValue,
+					fmt.Sprintf("Expected tag to have value %t, got %t", c.expectedValue, r.Bool.Value()))
+			}
 		}
 	}
 }
