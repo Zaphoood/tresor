@@ -37,6 +37,7 @@ type itemTable struct {
 	styles      table.Styles
 	stylesEmpty table.Styles
 	columns     []table.Column
+	uuids       []string
 }
 
 func newItemTable(styles table.Styles, columns []table.Column, options ...table.Option) itemTable {
@@ -85,6 +86,7 @@ func (t *itemTable) SetSize(width, height int) {
 
 func (t *itemTable) Clear() {
 	t.SetRows([]table.Row{})
+	t.uuids = []string{}
 }
 
 func (t *itemTable) Init() tea.Cmd {
@@ -101,12 +103,13 @@ func (t *itemTable) View() string {
 	return t.Model.View()
 }
 
-func (t *itemTable) Load(d *parser.Document, path []int, lastSelected *map[string]int) {
+func (t *itemTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
 		t.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
+		t.uuids = []string{}
 	}
 	group, ok := item.(parser.Group)
 	if !ok {
@@ -116,33 +119,40 @@ func (t *itemTable) Load(d *parser.Document, path []int, lastSelected *map[strin
 	t.LoadGroup(group, lastSelected)
 }
 
-func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]int) {
+func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]string) {
 	if len(group.Groups) == 0 && len(group.Entries) == 0 {
 		t.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
 		t.SetStyles(t.stylesEmpty)
+		t.uuids = []string{}
 	} else {
 		t.SetItems(group.Groups, group.Entries)
 		t.SetStyles(t.styles)
-		index, exists := (*lastSelected)[group.UUID]
-		if exists && index < len(t.Model.Rows()) {
-			t.SetCursor(index)
-		} else {
-			t.SetCursor(0)
+		t.SetCursor(0)
+		lastSelected, ok := (*lastSelected)[group.UUID]
+		if !ok {
+			return
+		}
+		for i, uuid := range t.uuids {
+			if uuid == lastSelected {
+				t.SetCursor(i)
+			}
 		}
 	}
-
 }
 
 func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	rows := make([]table.Row, len(groups)+len(entries))
+	t.uuids = make([]string, 0, len(groups)+len(entries))
 	for i, group := range groups {
 		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
+		t.uuids = append(t.uuids, group.UUID)
 	}
 	for i, entry := range entries {
 		title := entry.TryGet("Title", TITLE_PLACEH).Chardata
 		rows[len(groups)+i] = table.Row{title, ""}
+		t.uuids = append(t.uuids, entry.UUID)
 	}
 	t.SetRows(rows)
 }
@@ -173,4 +183,12 @@ func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		rows = append(rows, table.Row{field.Key, value})
 	}
 	t.SetRows(rows)
+	t.uuids = []string{}
+}
+
+func (t *itemTable) FocusedUUID() string {
+	if len(t.uuids) == 0 {
+		return ""
+	}
+	return t.uuids[t.Cursor()]
 }

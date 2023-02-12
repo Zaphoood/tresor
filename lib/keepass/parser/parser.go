@@ -102,17 +102,18 @@ type Group struct {
 	LastTopVisibleEntry     string
 }
 
-func (g *Group) At(index int) (Item, error) {
-	if index < 0 {
-		return nil, fmt.Errorf("Negative index: %d", index)
+func (g *Group) Get(uuid string) (Item, error) {
+	for _, group := range g.Groups {
+		if group.UUID == uuid {
+			return group, nil
+		}
 	}
-	if index < len(g.Groups) {
-		return g.Groups[index], nil
+	for _, entry := range g.Entries {
+		if entry.UUID == uuid {
+			return entry, nil
+		}
 	}
-	if index-len(g.Groups) < len(g.Entries) {
-		return g.Entries[index-len(g.Groups)], nil
-	}
-	return nil, fmt.Errorf("Index out of range for group '%s': %d", g.Name, index)
+	return nil, fmt.Errorf("Group '%s' has no item with UUID '%s'", g.Name, uuid)
 }
 
 type Entry struct {
@@ -289,21 +290,22 @@ func (d *Document) GetUnlocked(uuid, key string) (string, error) {
 	}
 }
 
-// ListPath returns subgroups and entries of a group specified by an array of indices. The document is traversed,
-// at each level choosing the group with the current index, until the end of the path is reached.
+// ListPath returns a group or an item specified by a path of UUIDs. The document is traversed,
+// at each level choosing the group with UUID at the current index, until the end of the path is reached.
+// The last UUID may be that of an item.
 // For an empty path the function will return the top-level groups (which is just one group for most KeePass files)
-func (d *Document) GetItem(path []int) (Item, error) {
+func (d *Document) GetItem(path []string) (Item, error) {
 	current := Group{Groups: d.Root.Groups}
 
 	for i := 0; i < len(path); i++ {
-		next, err := current.At(path[i])
+		next, err := current.Get(path[i])
 		if err != nil {
-			return nil, PathOutOfRange(fmt.Errorf("Invalid path entry at position %d: %s", i, err))
+			return nil, PathNotFound(fmt.Errorf("Invalid path entry at position %d: %s", i, err))
 		}
 		switch next := next.(type) {
 		case Group:
 			current = next
-		case Item:
+		case Entry:
 			if i == len(path)-1 {
 				return next, nil
 			}
@@ -328,4 +330,4 @@ func (d *Document) GetBinary(id int) ([]byte, error) {
 	return []byte{}, fmt.Errorf("No binary with ID: %d", id)
 }
 
-type PathOutOfRange error
+type PathNotFound error
