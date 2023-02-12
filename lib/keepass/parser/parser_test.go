@@ -23,12 +23,16 @@ func TestParse(t *testing.T) {
 	}
 	xmlFile, err := os.Open("../test/example_decrypted.xml")
 	defer xmlFile.Close()
-	assert.Nil(err)
+	if !assert.Nil(err) {
+		return
+	}
 
 	byteValue, _ := ioutil.ReadAll(xmlFile)
 
 	parsed, err := Parse(byteValue, *(*[32]byte)(key))
-	assert.Nil(err)
+	if !assert.Nil(err) {
+		return
+	}
 
 	assert.Equal(GENERATOR, parsed.Meta.Generator)
 	// We know that the first entry in the database has password "Password"

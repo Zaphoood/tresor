@@ -31,24 +31,32 @@ func TestLoadDb(t *testing.T) {
 	for _, file := range files {
 		d := New(file.path)
 		err := d.Load()
-		assert.Nil(err)
+		if !assert.Nil(err) {
+			continue
+		}
 
 		expectedVersion := version{3, 1}
 		version := d.Version()
 		assert.Equal(expectedVersion, version, fmt.Sprintf("Expected version: %d, got: %d", expectedVersion, version))
 
 		err = d.Decrypt(file.password)
-		assert.Nil(err)
+		if !assert.Nil(err) {
+			continue
+		}
 
 		plaintext := d.Plaintext()
 		assert.Equal(string(XML_HEADER), string(plaintext[:len(XML_HEADER)]))
 		assert.Equal(string(KEEPASS_END_TAG), string(plaintext[len(plaintext)-len(KEEPASS_END_TAG):]))
 
 		err = d.Parse()
-		assert.Nil(err)
+		if !assert.Nil(err) {
+			continue
+		}
 
 		valid, err := d.VerifyHeaderHash()
-		assert.Nil(err)
+		if !assert.Nil(err) {
+			continue
+		}
 		assert.True(valid, "Invalid header hash")
 	}
 }
