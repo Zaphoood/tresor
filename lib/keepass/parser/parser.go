@@ -317,6 +317,25 @@ func (d *Document) GetItem(path []string) (Item, error) {
 	return current, nil
 }
 
+// FindPath returns the relative path to a subgroup with the given UUID if it exists,
+// and a bool indicating wether the UUID was found.
+func (d *Document) FindPath(uuid string) ([]string, bool) {
+	return findPathInGroups(uuid, d.Root.Groups)
+}
+
+func findPathInGroups(uuid string, groups []Group) ([]string, bool) {
+	for _, group := range groups {
+		if group.UUID == uuid {
+			return []string{group.UUID}, true
+		}
+		subpath, found := findPathInGroups(uuid, group.Groups)
+		if found {
+			return append([]string{group.UUID}, subpath...), true
+		}
+	}
+	return nil, false
+}
+
 func (d *Document) GetBinary(id int) ([]byte, error) {
 	for _, binary := range d.Meta.Binaries {
 		if binary.ID == id {

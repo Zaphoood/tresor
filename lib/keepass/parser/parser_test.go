@@ -75,11 +75,22 @@ func TestParse(t *testing.T) {
 	assert.Equal(expectedDeletedItem.uuid, parsed.Root.DeletedObjects[0].UUID)
 	assert.Equal(expectedDeletedItem.deletionTime, parsed.Root.DeletedObjects[0].DeletionTime)
 
-	assert.False(parsed.Root.Groups[0].EnableAutoType.IsSet())
+	rootGroup := parsed.Root.Groups[0]
+	assert.False(rootGroup.EnableAutoType.IsSet())
 
-	assert.True(parsed.Root.Groups[0].Groups[0].EnableAutoType.IsSet())
-	assert.True(parsed.Root.Groups[0].Groups[0].EnableAutoType.Value())
+	assert.True(rootGroup.Groups[0].EnableAutoType.IsSet())
+	assert.True(rootGroup.Groups[0].EnableAutoType.Value())
 
-	assert.True(parsed.Root.Groups[0].Groups[0].EnableSearching.IsSet())
-	assert.False(parsed.Root.Groups[0].Groups[0].EnableSearching.Value())
+	assert.True(rootGroup.Groups[0].EnableSearching.IsSet())
+	assert.False(rootGroup.Groups[0].EnableSearching.Value())
+
+	uuid0 := "M0Gbdz4OmEaVH1j8pqgWFA==" // UUID of root group
+	path, found := parsed.FindPath(uuid0)
+	assert.True(found)
+	assert.Equal([]string{uuid0}, path)
+
+	uuid1 := "rrneGT70Vka3wdwglo3oDQ=="
+	path, found = parsed.FindPath(uuid1)
+	assert.True(found)
+	assert.Equal(uuid1, path[len(path)-1])
 }

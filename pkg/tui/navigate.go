@@ -33,7 +33,7 @@ type Navigate struct {
 	groupPreview itemTable
 	entryPreview itemTable
 	focusedItem  parser.Item
-	lastSelected map[string]string
+	lastCursor   map[string]string
 
 	lastCopy time.Time
 	path     []string
@@ -50,7 +50,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 	n := Navigate{
 		styles:       table.DefaultStyles(),
 		path:         []string{},
-		lastSelected: make(map[string]string),
+		lastCursor:   make(map[string]string),
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
 		database:     database,
@@ -65,6 +65,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 	}, entryViewColumns, true)
 
 	n.resizeAll()
+	n.loadLastSelected()
 	n.updateAll()
 
 	err := clipboard.Init()
@@ -92,10 +93,26 @@ func (n *Navigate) updateAll() {
 	if len(n.path) == 0 {
 		n.parent.Clear()
 	} else {
-		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], &n.lastSelected)
+		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], &n.lastCursor)
 	}
-	n.selector.Load(n.database.Parsed(), n.path, &n.lastSelected)
+	n.selector.Load(n.database.Parsed(), n.path, &n.lastCursor)
 	n.updatePreview()
+}
+
+func (n *Navigate) loadLastSelected() {
+	n.path = []string{n.database.Parsed().Root.Groups[0].UUID}
+	lastSelected := n.database.Parsed().Meta.LastSelectedGroup
+	if len(lastSelected) == 0 {
+		return
+	}
+	path, found := n.database.Parsed().FindPath(lastSelected)
+	if !found {
+		return
+	}
+	n.path = path
+	for i := 0; i < len(path)-1; i++ {
+		n.lastCursor[path[i]] = path[i+1]
+	}
 }
 
 func (n *Navigate) updatePreview() {
@@ -113,7 +130,7 @@ func (n *Navigate) updatePreview() {
 	switch item := item.(type) {
 	case parser.Group:
 		// A group is focused
-		n.groupPreview.LoadGroup(item, &n.lastSelected)
+		n.groupPreview.LoadGroup(item, &n.lastCursor)
 	case parser.Entry:
 		// An entry is focused
 		n.entryPreview.LoadEntry(item, n.database)
@@ -148,7 +165,7 @@ func (n *Navigate) moveRight() {
 
 func (n *Navigate) rememberSelected() {
 	if parentFocusedUUID := n.parent.FocusedUUID(); len(parentFocusedUUID) > 0 {
-		n.lastSelected[parentFocusedUUID] = n.focusedUUID()
+		n.lastCursor[parentFocusedUUID] = n.focusedUUID()
 	}
 }
 
