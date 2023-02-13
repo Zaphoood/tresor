@@ -55,14 +55,14 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		windowHeight: windowHeight,
 		database:     database,
 	}
-	n.parent = newItemTable(n.styles, itemViewColumns)
-	n.selector = newItemTable(n.styles, itemViewColumns, table.WithFocused(true))
-	n.groupPreview = newItemTable(n.styles, itemViewColumns)
+	n.parent = newItemTable(n.styles, itemViewColumns, true)
+	n.selector = newItemTable(n.styles, itemViewColumns, true, table.WithFocused(true))
+	n.groupPreview = newItemTable(n.styles, itemViewColumns, true)
 	n.entryPreview = newItemTable(table.Styles{
 		Header:   n.styles.Header.Copy(),
 		Cell:     n.styles.Cell.Copy(),
 		Selected: lipgloss.NewStyle(),
-	}, entryViewColumns)
+	}, entryViewColumns, true)
 
 	n.resizeAll()
 	n.updateAll()

@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
@@ -37,10 +39,11 @@ type itemTable struct {
 	styles      table.Styles
 	stylesEmpty table.Styles
 	columns     []table.Column
+	sorted      bool
 	uuids       []string
 }
 
-func newItemTable(styles table.Styles, columns []table.Column, options ...table.Option) itemTable {
+func newItemTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) itemTable {
 	return itemTable{
 		Model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
@@ -52,6 +55,7 @@ func newItemTable(styles table.Styles, columns []table.Column, options ...table.
 				Bold(false),
 		},
 		columns: columns,
+		sorted:  sorted,
 	}
 }
 
@@ -82,6 +86,14 @@ func (t *itemTable) SetSize(width, height int) {
 	}
 
 	t.SetColumns(newColumns)
+}
+
+func (t *itemTable) SetSorted(v bool) {
+	t.sorted = v
+}
+
+func (t *itemTable) Sorted() bool {
+	return t.sorted
 }
 
 func (t *itemTable) Clear() {
@@ -143,15 +155,38 @@ func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]strin
 }
 
 func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
-	rows := make([]table.Row, len(groups)+len(entries))
+	rows := make([]table.Row, 0, len(groups)+len(entries))
 	t.uuids = make([]string, 0, len(groups)+len(entries))
-	for i, group := range groups {
-		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
+	groupsSorted := make([]*parser.Group, 0, len(groups))
+	entriesSorted := make([]*parser.Entry, 0, len(entries))
+	for i := range groups {
+		groupsSorted = append(groupsSorted, &groups[i])
+	}
+	for i := range entries {
+		entriesSorted = append(entriesSorted, &entries[i])
+	}
+	if t.sorted {
+		sort.Slice(groupsSorted, func(i, j int) bool {
+			return strings.ToLower(groupsSorted[i].Name) < strings.ToLower(groupsSorted[j].Name)
+		})
+		sort.Slice(entriesSorted, func(i, j int) bool {
+			firstTitle, err1 := entriesSorted[i].Get("Title")
+			secondTitle, err2 := entriesSorted[j].Get("Title")
+			if err1 != nil {
+				return false
+			} else if err2 != nil {
+				return true
+			}
+			return strings.ToLower(firstTitle.Chardata) < strings.ToLower(secondTitle.Chardata)
+		})
+	}
+	for _, group := range groupsSorted {
+		rows = append(rows, table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))})
 		t.uuids = append(t.uuids, group.UUID)
 	}
-	for i, entry := range entries {
+	for _, entry := range entriesSorted {
 		title := entry.TryGet("Title", TITLE_PLACEH).Chardata
-		rows[len(groups)+i] = table.Row{title, ""}
+		rows = append(rows, table.Row{title, ""})
 		t.uuids = append(t.uuids, entry.UUID)
 	}
 	t.SetRows(rows)
