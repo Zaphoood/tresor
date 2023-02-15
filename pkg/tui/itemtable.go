@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
@@ -37,9 +39,11 @@ type itemTable struct {
 	styles      table.Styles
 	stylesEmpty table.Styles
 	columns     []table.Column
+	sorted      bool
+	uuids       []string
 }
 
-func newItemTable(styles table.Styles, columns []table.Column, options ...table.Option) itemTable {
+func newItemTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) itemTable {
 	return itemTable{
 		Model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
@@ -51,6 +55,7 @@ func newItemTable(styles table.Styles, columns []table.Column, options ...table.
 				Bold(false),
 		},
 		columns: columns,
+		sorted:  sorted,
 	}
 }
 
@@ -83,8 +88,17 @@ func (t *itemTable) SetSize(width, height int) {
 	t.SetColumns(newColumns)
 }
 
+func (t *itemTable) SetSorted(v bool) {
+	t.sorted = v
+}
+
+func (t *itemTable) Sorted() bool {
+	return t.sorted
+}
+
 func (t *itemTable) Clear() {
 	t.SetRows([]table.Row{})
+	t.uuids = []string{}
 }
 
 func (t *itemTable) Init() tea.Cmd {
@@ -101,12 +115,13 @@ func (t *itemTable) View() string {
 	return t.Model.View()
 }
 
-func (t *itemTable) Load(d *parser.Document, path []int, lastSelected *map[string]int) {
+func (t *itemTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
 		t.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
+		t.uuids = []string{}
 	}
 	group, ok := item.(parser.Group)
 	if !ok {
@@ -116,33 +131,63 @@ func (t *itemTable) Load(d *parser.Document, path []int, lastSelected *map[strin
 	t.LoadGroup(group, lastSelected)
 }
 
-func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]int) {
+func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]string) {
 	if len(group.Groups) == 0 && len(group.Entries) == 0 {
 		t.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
 		t.SetStyles(t.stylesEmpty)
+		t.uuids = []string{}
 	} else {
 		t.SetItems(group.Groups, group.Entries)
 		t.SetStyles(t.styles)
-		index, exists := (*lastSelected)[group.UUID]
-		if exists && index < len(t.Model.Rows()) {
-			t.SetCursor(index)
-		} else {
-			t.SetCursor(0)
+		t.SetCursor(0)
+		lastSelected, ok := (*lastSelected)[group.UUID]
+		if !ok {
+			return
+		}
+		for i, uuid := range t.uuids {
+			if uuid == lastSelected {
+				t.SetCursor(i)
+			}
 		}
 	}
-
 }
 
 func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
-	rows := make([]table.Row, len(groups)+len(entries))
-	for i, group := range groups {
-		rows[i] = table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))}
+	rows := make([]table.Row, 0, len(groups)+len(entries))
+	t.uuids = make([]string, 0, len(groups)+len(entries))
+	groupsSorted := make([]*parser.Group, 0, len(groups))
+	entriesSorted := make([]*parser.Entry, 0, len(entries))
+	for i := range groups {
+		groupsSorted = append(groupsSorted, &groups[i])
 	}
-	for i, entry := range entries {
+	for i := range entries {
+		entriesSorted = append(entriesSorted, &entries[i])
+	}
+	if t.sorted {
+		sort.Slice(groupsSorted, func(i, j int) bool {
+			return strings.ToLower(groupsSorted[i].Name) < strings.ToLower(groupsSorted[j].Name)
+		})
+		sort.Slice(entriesSorted, func(i, j int) bool {
+			firstTitle, err1 := entriesSorted[i].Get("Title")
+			secondTitle, err2 := entriesSorted[j].Get("Title")
+			if err1 != nil {
+				return false
+			} else if err2 != nil {
+				return true
+			}
+			return strings.ToLower(firstTitle.Chardata) < strings.ToLower(secondTitle.Chardata)
+		})
+	}
+	for _, group := range groupsSorted {
+		rows = append(rows, table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))})
+		t.uuids = append(t.uuids, group.UUID)
+	}
+	for _, entry := range entriesSorted {
 		title := entry.TryGet("Title", TITLE_PLACEH).Chardata
-		rows[len(groups)+i] = table.Row{title, ""}
+		rows = append(rows, table.Row{title, ""})
+		t.uuids = append(t.uuids, entry.UUID)
 	}
 	t.SetRows(rows)
 }
@@ -173,4 +218,12 @@ func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		rows = append(rows, table.Row{field.Key, value})
 	}
 	t.SetRows(rows)
+	t.uuids = []string{}
+}
+
+func (t *itemTable) FocusedUUID() string {
+	if len(t.uuids) == 0 {
+		return ""
+	}
+	return t.uuids[t.Cursor()]
 }
