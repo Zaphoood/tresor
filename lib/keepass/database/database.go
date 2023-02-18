@@ -19,9 +19,13 @@ import (
 )
 
 const (
-	SHA256_DIGEST_LEN = 32
-	WORD              = 2
-	DWORD             = 4
+	SHA256_DIGEST_LEN           = 32
+	WORD                        = 2
+	DWORD                       = 4
+	MASTER_SEED_LEN             = 32
+	TRANSFORM_SEED_LEN          = 32
+	INNER_RANDOM_STREAM_KEY_LEN = 32
+	STREAM_START_BYTES_LEN      = 32
 )
 
 type block struct {
@@ -297,4 +301,33 @@ func (d *Database) VerifyHeaderHash() (bool, error) {
 		return false, err
 	}
 	return bytes.Equal(d.headerHash[:], storedHash[:length]), nil
+}
+
+func (d *Database) Save() error {
+	return d.SaveToPath(d.path)
+}
+
+func (d *Database) SaveToPath(path string) error {
+
+	// Inner random stream encryption
+
+	// Marshal XML
+	// Make plaintext blocks
+	// Encrypt
+
+	// Write header
+	// Write ciphertext
+
+	masterSeed := make([]byte, MASTER_SEED_LEN)
+	transformSeed := make([]byte, TRANSFORM_SEED_LEN)
+	encryptionIV := make([]byte, len(d.header.encryptionIV))
+	irsKey := make([]byte, INNER_RANDOM_STREAM_KEY_LEN)
+	streamStartBytes := make([]byte, STREAM_START_BYTES_LEN)
+
+	masterKey, err := crypto.GenerateMasterKey(d.password, masterSeed, transformSeed, d.header.transformRounds)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
