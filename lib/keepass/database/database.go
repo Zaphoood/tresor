@@ -92,6 +92,7 @@ func (e BlockSizeError) Error() string {
 
 type Database struct {
 	path       string
+	password   string
 	version    version
 	header     header
 	headerHash [SHA256_DIGEST_LEN]byte
@@ -109,6 +110,10 @@ func New(path string) Database {
 
 func (d Database) Path() string {
 	return d.path
+}
+
+func (d *Database) SetPassword(password string) {
+	d.password = password
 }
 
 func (d Database) Plaintext() []byte {
@@ -182,8 +187,8 @@ func (d *Database) Load() error {
 	return nil
 }
 
-func (d *Database) Decrypt(password string) error {
-	masterKey, err := crypto.GenerateMasterKey(password, d.header.masterSeed, d.header.transformSeed, d.header.transformRounds)
+func (d *Database) Decrypt() error {
+	masterKey, err := crypto.GenerateMasterKey(d.password, d.header.masterSeed, d.header.transformSeed, d.header.transformRounds)
 	if err != nil {
 		return err
 	}

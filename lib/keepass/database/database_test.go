@@ -39,7 +39,8 @@ func TestLoadDb(t *testing.T) {
 		version := d.Version()
 		assert.Equal(expectedVersion, version, fmt.Sprintf("Expected version: %d, got: %d", expectedVersion, version))
 
-		err = d.Decrypt(file.password)
+		d.SetPassword(file.password)
+		err = d.Decrypt()
 		if !assert.Nil(err) {
 			continue
 		}
@@ -78,7 +79,8 @@ func TestErrors(t *testing.T) {
 		err := d.Load()
 		assert.IsType(t, c.loadErr, err, fmt.Sprintf("Expected '%T' when loading '%s'", c.loadErr, c.path))
 		if err == nil {
-			err = d.Decrypt("foo")
+			d.SetPassword("foo")
+			err = d.Decrypt()
 			assert.IsType(t, c.decryptErr, err, fmt.Sprintf("Expected '%T' when decrypting '%s'", c.decryptErr, c.path))
 		}
 	}
