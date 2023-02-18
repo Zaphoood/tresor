@@ -5,6 +5,8 @@ import (
 	"crypto/cipher"
 	"crypto/sha256"
 	"fmt"
+
+	"github.com/andreburgaud/crypt2go/padding"
 )
 
 func GenerateMasterKey(password string, masterSeed, transformSeed []byte, transformRounds uint64) ([]byte, error) {
@@ -51,5 +53,27 @@ func DecryptAES(ciphertext, key, iv []byte) ([]byte, error) {
 	plaintext := make([]byte, len(ciphertext))
 	mode := cipher.NewCBCDecrypter(cfr, iv)
 	mode.CryptBlocks(plaintext, ciphertext)
-	return plaintext, nil
+	padder := padding.NewPkcs7Padding(aes.BlockSize)
+	unpadded, err := padder.Unpad(plaintext)
+	if err != nil {
+		return nil, err
+	} else {
+		return unpadded, nil
+	}
+}
+
+func EncryptAES(plaintext, key, iv []byte) ([]byte, error) {
+	cfr, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	padder := padding.NewPkcs7Padding(aes.BlockSize)
+	padded, err := padder.Pad(plaintext)
+	if err != nil {
+		return nil, err
+	}
+	ciphertext := make([]byte, len(padded))
+	mode := cipher.NewCBCEncrypter(cfr, iv)
+	mode.CryptBlocks(ciphertext, padded)
+	return ciphertext, nil
 }

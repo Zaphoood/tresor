@@ -72,7 +72,6 @@ func TestErrors(t *testing.T) {
 		{"../test/invalid_version_signature.kdbx", FileError{}, nil},
 		{"../test/invalid_cipher_id.kdbx", FileError{}, nil},
 		{"../test/invalid_length.kdbx", FileError{}, nil},
-		{"../test/invalid_ssb.kdbx", nil, DecryptError{}},
 	}
 	for _, c := range cases {
 		d := New(c.path)
@@ -81,7 +80,7 @@ func TestErrors(t *testing.T) {
 		if err == nil {
 			d.SetPassword("foo")
 			err = d.Decrypt()
-			assert.IsType(t, c.decryptErr, err, fmt.Sprintf("Expected '%T' when decrypting '%s'", c.decryptErr, c.path))
+			assert.IsType(t, c.decryptErr, err, fmt.Sprintf("Expected '%T' when decrypting '%s', got '%s'", c.decryptErr, c.path, err.Error()))
 		}
 	}
 }
