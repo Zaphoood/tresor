@@ -3,8 +3,27 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/sha256"
 	"fmt"
 )
+
+func GenerateMasterKey(password string, masterSeed, transformSeed []byte, transformRounds uint64) ([]byte, error) {
+	// Generate composite key
+	compositeKey := sha256.Sum256([]byte(password))
+	compositeKey = sha256.Sum256(compositeKey[:])
+
+	// Generate master key
+	transformOut, err := AESRounds(compositeKey[:], transformSeed, transformRounds)
+	if err != nil {
+		return nil, err
+	}
+	transformKey := sha256.Sum256(transformOut)
+
+	h := sha256.New()
+	h.Write(masterSeed)
+	h.Write(transformKey[:])
+	return h.Sum(nil), nil
+}
 
 func AESRounds(in, seed []byte, rounds uint64) ([]byte, error) {
 	if len(in)%aes.BlockSize != 0 {

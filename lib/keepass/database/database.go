@@ -183,7 +183,7 @@ func (d *Database) Load() error {
 }
 
 func (d *Database) Decrypt(password string) error {
-	masterKey, err := d.generateMasterKey(password)
+	masterKey, err := crypto.GenerateMasterKey(password, d.header.masterSeed, d.header.transformSeed, d.header.transformRounds)
 	if err != nil {
 		return err
 	}
@@ -213,23 +213,6 @@ func (d *Database) Decrypt(password string) error {
 	return nil
 }
 
-func (d *Database) generateMasterKey(password string) ([]byte, error) {
-	// Generate composite key
-	compositeKey := sha256.Sum256([]byte(password))
-	compositeKey = sha256.Sum256(compositeKey[:])
-
-	// Generate master key
-	transformOut, err := crypto.AESRounds(compositeKey[:], d.header.transformSeed, d.header.transformRounds)
-	if err != nil {
-		return nil, err
-	}
-	transformKey := sha256.Sum256(transformOut)
-
-	h := sha256.New()
-	h.Write(d.header.masterSeed)
-	h.Write(transformKey[:])
-	return h.Sum(nil), nil
-}
 
 func (d *Database) checkStreamStartBytes(plaintext *[]byte) bool {
 	ok := bytes.Equal(d.header.streamStartBytes, (*plaintext)[:len(d.header.streamStartBytes)])
