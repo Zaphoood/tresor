@@ -218,7 +218,6 @@ func (d *Database) Decrypt() error {
 	return nil
 }
 
-
 func (d *Database) checkStreamStartBytes(plaintext *[]byte) bool {
 	ok := bytes.Equal(d.header.streamStartBytes, (*plaintext)[:len(d.header.streamStartBytes)])
 	*plaintext = (*plaintext)[len(d.header.streamStartBytes):]

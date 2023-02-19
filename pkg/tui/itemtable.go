@@ -177,7 +177,7 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 			} else if err2 != nil {
 				return true
 			}
-			return strings.ToLower(firstTitle.Chardata) < strings.ToLower(secondTitle.Chardata)
+			return strings.ToLower(firstTitle.Inner) < strings.ToLower(secondTitle.Inner)
 		})
 	}
 	for _, group := range groupsSorted {
@@ -185,7 +185,7 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 		t.uuids = append(t.uuids, group.UUID)
 	}
 	for _, entry := range entriesSorted {
-		title := entry.TryGet("Title", TITLE_PLACEH).Chardata
+		title := entry.TryGet("Title", TITLE_PLACEH).Inner
 		rows = append(rows, table.Row{title, ""})
 		t.uuids = append(t.uuids, entry.UUID)
 	}
@@ -198,10 +198,10 @@ func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	var value string
 	for _, field := range defaultFields {
 		r := entry.TryGet(field.key, field.defaultValue)
-		if r.IsProtected() {
+		if r.Protected {
 			value = ENCRYPTED_PLACEH
 		} else {
-			value = r.Chardata
+			value = r.Inner
 		}
 		rows = append(rows, table.Row{field.displayName, value})
 		visited[field.key] = struct{}{}
@@ -210,10 +210,10 @@ func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		if _, v := visited[field.Key]; v {
 			continue
 		}
-		if field.Value.IsProtected() {
+		if field.Value.Protected {
 			value = ENCRYPTED_PLACEH
 		} else {
-			value = field.Value.Chardata
+			value = field.Value.Inner
 		}
 		rows = append(rows, table.Row{field.Key, value})
 	}

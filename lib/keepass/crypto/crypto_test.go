@@ -25,7 +25,7 @@ func TestCrypt(t *testing.T) {
 		[]byte("foo bar"),
 		[]byte("Lorem ipsum dolor sit amet consectetur"),
 	}
-		for _, plaintext := range plaintexts {
+	for _, plaintext := range plaintexts {
 		encrypted, err := EncryptAES(plaintext, key, iv)
 		if !assert.Nil(err) {
 			return

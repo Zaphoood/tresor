@@ -38,8 +38,10 @@ func TestParse(t *testing.T) {
 	assert.Equal(GENERATOR, parsed.Meta.Generator)
 	// We know that the first entry in the database has password "Password"
 	firstEntry := parsed.Root.Groups[0].Entries[0]
-	firstEntryUUID := firstEntry.UUID
-	assert.Equal("Password", parsed.Unlocked[firstEntryUUID].Strings[0].Value.Chardata)
+	password, err := firstEntry.Get("Password")
+	if assert.Nil(err) {
+		assert.Equal("Password", password.Inner)
+	}
 
 	assert.Equal(2, len(firstEntry.BinaryRefs))
 	for _, bref := range firstEntry.BinaryRefs {

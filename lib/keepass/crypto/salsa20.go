@@ -16,10 +16,10 @@ func NewSalsa20Stream(key [32]byte) *Salsa20Stream {
 	return &Salsa20Stream{nonce: SALSA20_NONCE, key: key}
 }
 
-func (s *Salsa20Stream) Decrypt(ciphertext []byte) []byte {
+func (s *Salsa20Stream) Decrypt(ciphertext []byte) ([]byte, error) {
 	s.accum = append(s.accum, ciphertext...)
 	out := make([]byte, len(s.accum))
 	salsa20.XORKeyStream(out, s.accum, s.nonce, &s.key)
 
-	return out[len(out)-len(ciphertext):]
+	return out[len(out)-len(ciphertext):], nil
 }
