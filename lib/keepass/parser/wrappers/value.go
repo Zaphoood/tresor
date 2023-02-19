@@ -17,8 +17,8 @@ func SetInnerRandomStream(s crypto.Stream) {
 
 type Value struct {
 	XMLName   xml.Name `xml:"Value"`
-	Inner     string
-	Protected bool
+	Inner     string   `xml:",chardata"`
+	Protected bool     `xml:",attr"`
 }
 
 func (v *Value) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
@@ -58,4 +58,28 @@ func (v *Value) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		v.Inner = chardata
 	}
 	return nil
+}
+
+func (v *Value) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	if !v.Protected {
+		return e.EncodeElement(v.Inner, start)
+	}
+
+	start.Attr = []xml.Attr{
+		{
+			Name:  xml.Name{Local: "Protected"},
+			Value: "True",
+		},
+	}
+
+	if stream == nil {
+		return errors.New("Error while unmarshalling protected Value: stream is nil")
+	}
+	encrypted, err := stream.Encrypt([]byte(v.Inner))
+	if err != nil {
+		return err
+	}
+	encoded := base64.StdEncoding.EncodeToString(encrypted)
+
+	return e.EncodeElement(encoded, start)
 }

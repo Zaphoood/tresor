@@ -55,3 +55,16 @@ func (b *Bool) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		return fmt.Errorf("Failed to unmarshal element '%s' as literal bool. Want 'True' or 'False', got '%s'", start.Name.Local, charData)
 	}
 }
+
+func (b *Bool) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	var str string
+	switch {
+	case !b.isSet:
+		str = "null"
+	case b.value:
+		str = "True"
+	case !b.value:
+		str = "False"
+	}
+	return e.EncodeElement(str, start)
+}

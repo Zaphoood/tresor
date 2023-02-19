@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"crypto/aes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -308,23 +309,29 @@ func (d *Database) Save() error {
 }
 
 func (d *Database) SaveToPath(path string) error {
+	if d.parsed == nil {
+		return errors.New("Tried to save database to file but parsed is nil")
+	}
+	//masterSeed := make([]byte, MASTER_SEED_LEN)
+	//transformSeed := make([]byte, TRANSFORM_SEED_LEN)
+	//encryptionIV := make([]byte, len(d.header.encryptionIV))
+	protectedStreamKey := make([]byte, INNER_RANDOM_STREAM_KEY_LEN)
+	rand.Read(protectedStreamKey)
+	//streamStartBytes := make([]byte, STREAM_START_BYTES_LEN)
 
-	// Inner random stream encryption
+	xml, err := parser.Unparse(d.parsed, *(*[32]byte)(protectedStreamKey))
+	if err != nil {
+		return err
+	}
+	os.WriteFile("../../../saved.xml", xml, 0666)
 
-	// Marshal XML
 	// Make plaintext blocks
 	// Encrypt
 
 	// Write header
 	// Write ciphertext
 
-	masterSeed := make([]byte, MASTER_SEED_LEN)
-	transformSeed := make([]byte, TRANSFORM_SEED_LEN)
-	encryptionIV := make([]byte, len(d.header.encryptionIV))
-	irsKey := make([]byte, INNER_RANDOM_STREAM_KEY_LEN)
-	streamStartBytes := make([]byte, STREAM_START_BYTES_LEN)
-
-	masterKey, err := crypto.GenerateMasterKey(d.password, masterSeed, transformSeed, d.header.transformRounds)
+	//masterKey, err := crypto.GenerateMasterKey(d.password, masterSeed, transformSeed, d.header.transformRounds)
 	if err != nil {
 		return err
 	}

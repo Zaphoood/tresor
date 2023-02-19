@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	// TODO: Use `xml.Header` from 'encoding/xml' instead
 	XML_HEADER      = []byte("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>")
 	KEEPASS_END_TAG = []byte("</KeePassFile>")
 )
@@ -60,6 +61,25 @@ func TestLoadDb(t *testing.T) {
 		}
 		assert.True(valid, "Invalid header hash")
 	}
+}
+
+func TestLoadSave(t *testing.T) {
+	assert := assert.New(t)
+
+	path := "../test/example.kdbx"
+	d := New(path)
+	if !assert.Nil(d.Load()) {
+		return
+	}
+
+	d.SetPassword("foo")
+	if !assert.Nil(d.Decrypt()) {
+		return
+	}
+	if !assert.Nil(d.Parse()) {
+		return
+	}
+	assert.Nil(d.SaveToPath("out.kdbx"))
 }
 
 func TestErrors(t *testing.T) {

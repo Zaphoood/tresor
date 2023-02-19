@@ -84,11 +84,10 @@ type Item interface{}
 
 type Group struct {
 	XMLName xml.Name `xml:"Group"`
-	Groups  []Group  `xml:"Group"`
-	Entries []Entry  `xml:"Entry"`
 
 	UUID                    string
 	Name                    string
+	Notes                   string
 	IconID                  int
 	Times                   Times
 	IsExpanded              wrappers.Bool
@@ -96,6 +95,9 @@ type Group struct {
 	EnableAutoType          wrappers.Bool
 	EnableSearching         wrappers.Bool
 	LastTopVisibleEntry     string
+
+	Entries []Entry `xml:"Entry"`
+	Groups  []Group `xml:"Group"`
 }
 
 func (g *Group) Get(uuid string) (Item, error) {
@@ -150,12 +152,12 @@ type BinaryReferenceValue struct {
 type AutoType struct {
 	Enabled                 wrappers.Bool
 	DataTransferObfuscation int
-	Association             Association
+	Association             *Association `xml:",omitempty"`
 }
 
 type Association struct {
-	Window            string
-	KeystrokeSequence string
+	Window            string `xml:",omitempty"`
+	KeystrokeSequence string `xml:",omitempty"`
 }
 
 func (e *Entry) Get(key string) (wrappers.Value, error) {
@@ -192,6 +194,22 @@ func Parse(b []byte, key [32]byte) (*Document, error) {
 		return nil, err
 	}
 	return p, nil
+}
+
+func Unparse(d *Document, key [32]byte) ([]byte, error) {
+	salsa := crypto.NewSalsa20Stream(key)
+	wrappers.SetInnerRandomStream(salsa)
+
+	out, err := xml.MarshalIndent(d, "", "\t")
+	if err != nil {
+		return nil, err
+	}
+	unparsed := make([]byte, 0, len(xml.Header)+1+len(out))
+	unparsed = append(unparsed, xml.Header...)
+	unparsed = append(unparsed, byte('\n'))
+	unparsed = append(unparsed, out...)
+
+	return out, nil
 }
 
 type field struct {

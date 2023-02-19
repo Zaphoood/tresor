@@ -23,3 +23,9 @@ func (s *Salsa20Stream) Decrypt(ciphertext []byte) ([]byte, error) {
 
 	return out[len(out)-len(ciphertext):], nil
 }
+
+
+// Encrypt encrypts a given bytearray. The operation is the same as decrypting
+func (s *Salsa20Stream) Encrypt(plaintext []byte) ([]byte, error) {
+	return s.Decrypt(plaintext)
+}
