@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -11,8 +12,12 @@ import (
 )
 
 const (
-	TLV_TYPE_LEN   = 1
-	TLV_LENGTH_LEN = 2
+	TLV_TYPE_LEN                = 1
+	TLV_LENGTH_LEN              = 2
+	MASTER_SEED_LEN             = 32
+	TRANSFORM_SEED_LEN          = 32
+	INNER_RANDOM_STREAM_KEY_LEN = 32
+	STREAM_START_BYTES_LEN      = 32
 )
 
 type headerCode uint8
@@ -83,6 +88,23 @@ type header struct {
 	protectedStreamKey [32]byte
 	streamStartBytes   []byte
 	irs                IRSID
+}
+
+func newHeader(encryptionIVLength int) header {
+	return header{
+		masterSeed:       make([]byte, MASTER_SEED_LEN),
+		transformSeed:    make([]byte, TRANSFORM_SEED_LEN),
+		encryptionIV:     make([]byte, encryptionIVLength),
+		streamStartBytes: make([]byte, STREAM_START_BYTES_LEN),
+	}
+}
+
+func (h *header) randomize() {
+	rand.Read(h.masterSeed)
+	rand.Read(h.transformSeed)
+	rand.Read(h.encryptionIV)
+	rand.Read(h.streamStartBytes)
+	rand.Read(h.protectedStreamKey[:])
 }
 
 func (h *header) read(stream io.Reader) error {

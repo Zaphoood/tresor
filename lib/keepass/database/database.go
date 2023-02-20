@@ -3,7 +3,6 @@ package database
 import (
 	"bytes"
 	"crypto/aes"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -20,13 +19,9 @@ import (
 )
 
 const (
-	SHA256_DIGEST_LEN           = 32
-	WORD                        = 2
-	DWORD                       = 4
-	MASTER_SEED_LEN             = 32
-	TRANSFORM_SEED_LEN          = 32
-	INNER_RANDOM_STREAM_KEY_LEN = 32
-	STREAM_START_BYTES_LEN      = 32
+	SHA256_DIGEST_LEN = 32
+	WORD              = 2
+	DWORD             = 4
 )
 
 type block struct {
@@ -312,14 +307,10 @@ func (d *Database) SaveToPath(path string) error {
 	if d.parsed == nil {
 		return errors.New("Tried to save database to file but parsed is nil")
 	}
-	//masterSeed := make([]byte, MASTER_SEED_LEN)
-	//transformSeed := make([]byte, TRANSFORM_SEED_LEN)
-	//encryptionIV := make([]byte, len(d.header.encryptionIV))
-	protectedStreamKey := make([]byte, INNER_RANDOM_STREAM_KEY_LEN)
-	rand.Read(protectedStreamKey)
-	//streamStartBytes := make([]byte, STREAM_START_BYTES_LEN)
+	h := newHeader(aes.BlockSize)
+	h.randomize()
 
-	xml, err := parser.Unparse(d.parsed, *(*[32]byte)(protectedStreamKey))
+	xml, err := parser.Unparse(d.parsed, h.protectedStreamKey)
 	if err != nil {
 		return err
 	}
