@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"sort"
 
@@ -193,19 +194,20 @@ func (d *Database) Decrypt() error {
 		return err
 	}
 
-	plaintext, err := crypto.DecryptAES(d.ciphertext, masterKey, d.header.encryptionIV)
+	plainBlocks, err := crypto.DecryptAES(d.ciphertext, masterKey, d.header.encryptionIV)
 	if err != nil {
 		return err
 	}
 
-	if !d.checkStreamStartBytes(&plaintext) {
+	if !d.checkStreamStartBytes(&plainBlocks) {
 		return DecryptError{errors.New("Wrong password")}
 	}
 
-	err = d.parseBlocks(&plaintext)
+	plaintext, err := parseBlocks(&plainBlocks)
 	if err != nil {
 		return err
 	}
+	d.plaintext = *plaintext
 
 	if d.header.gzipCompression {
 		out, err := util.Unzip(&d.plaintext)
@@ -224,24 +226,24 @@ func (d *Database) checkStreamStartBytes(plaintext *[]byte) bool {
 	return ok
 }
 
-func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
+func parseBlocks(plainBlocks *[]byte) (*[]byte, error) {
 	blocks := make(map[uint32]block)
 	hashIndex := 0
 	totalSize := 0
 	i := 0
-	for i < len((*plaintextBlocks)) {
+	for i < len(*plainBlocks) {
 		// Read block id
-		blockID := binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD])
+		blockID := binary.LittleEndian.Uint32((*plainBlocks)[i : i+DWORD])
 		i += DWORD
 		if _, exists := blocks[blockID]; exists {
-			return ParseError{fmt.Errorf("Duplicate block ID: %d", blockID)}
+			return nil, ParseError{fmt.Errorf("Duplicate block ID: %d", blockID)}
 		}
 		// Store index of hash for later comparison
 		hashIndex = i
 		i += SHA256_DIGEST_LEN
 
 		// Read block size
-		blockSize := int(binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD]))
+		blockSize := int(binary.LittleEndian.Uint32((*plainBlocks)[i : i+DWORD]))
 		// Final block has block size 0
 		if blockSize == 0 {
 			break
@@ -249,9 +251,9 @@ func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
 		i += DWORD
 
 		// Hash and compare
-		hash := sha256.Sum256((*plaintextBlocks)[i : i+blockSize])
-		if !bytes.Equal(hash[:], (*plaintextBlocks)[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
-			return ParseError{errors.New("Block hash does not match. File may be corrupted")}
+		hash := sha256.Sum256((*plainBlocks)[i : i+blockSize])
+		if !bytes.Equal(hash[:], (*plainBlocks)[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
+			return nil, ParseError{errors.New("Block hash does not match. File may be corrupted")}
 		}
 		blocks[blockID] = block{start: i, length: blockSize}
 		totalSize += blockSize
@@ -265,15 +267,41 @@ func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
 	}
 	sort.Ints(blockIDs)
 
-	d.plaintext = make([]byte, totalSize)
+	out := make([]byte, totalSize)
 	pos := 0
 	for _, id := range blockIDs {
 		block := blocks[uint32(id)]
-		copy(d.plaintext[pos:pos+block.length], (*plaintextBlocks)[block.start:block.start+block.length])
+		copy(out[pos:pos+block.length], (*plainBlocks)[block.start:block.start+block.length])
 		pos += block.length
 	}
 
-	return nil
+	return &out, nil
+}
+
+// formatBocks does the opposite of parseBlocks: It formats the given byte array as one block,
+// followed by a zero-block (length and hash are all zeros) which indicates the last block
+func formatBocks(in *[]byte) (*[]byte, error) {
+	zeroBuf := []byte{0x00, 0x00, 0x00, 0x00}
+	oneBuf := []byte{0x01, 0x00, 0x00, 0x00}
+
+	inputLength := uint32(len(*in))
+	totalLength := 4*DWORD + 2*SHA256_DIGEST_LEN + inputLength
+	hash := sha256.Sum256(*in)
+	lengthBuf := make([]byte, DWORD)
+	binary.LittleEndian.PutUint32(lengthBuf, inputLength)
+
+	out := make([]byte, 0, totalLength)
+	// One block for the entire file content
+	out = append(out, zeroBuf...)
+	out = append(out, hash[:]...)
+	out = append(out, lengthBuf[:]...)
+	out = append(out, *in...)
+	// Last block to signal end of file
+	out = append(out, oneBuf...)
+	out = append(out, make([]byte, SHA256_DIGEST_LEN)...)
+	out = append(out, zeroBuf...)
+
+	return &out, nil
 }
 
 func (d *Database) Parse() error {
@@ -314,9 +342,14 @@ func (d *Database) SaveToPath(path string) error {
 	if err != nil {
 		return err
 	}
-	os.WriteFile("../../../saved.xml", xml, 0666)
+	//os.WriteFile("../../../saved.xml", xml, 0666)
 
 	// Make plaintext blocks
+	plainBlocks, err := formatBocks(&xml)
+	if err != nil {
+		return err
+	}
+	log.Printf("Blocks: %x\n\n...\n\n%x", (*plainBlocks)[:64], (*plainBlocks)[len(*plainBlocks)-64:])
 	// Encrypt
 
 	// Write header
