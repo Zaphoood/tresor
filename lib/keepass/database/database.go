@@ -352,10 +352,15 @@ func (d *Database) SaveToPath(path string) error {
 	log.Printf("Blocks: %x\n\n...\n\n%x", (*plainBlocks)[:64], (*plainBlocks)[len(*plainBlocks)-64:])
 	// Encrypt
 
+	masterKey, err := crypto.GenerateMasterKey(d.password, h.masterSeed, h.transformSeed, d.header.transformRounds)
+	encrypted, err := crypto.EncryptAES(*plainBlocks, masterKey, h.encryptionIV)
+
+	log.Printf("'%x'\n", encrypted[:64])
+
+	// Open file
 	// Write header
 	// Write ciphertext
 
-	//masterKey, err := crypto.GenerateMasterKey(d.password, masterSeed, transformSeed, d.header.transformRounds)
 	if err != nil {
 		return err
 	}
