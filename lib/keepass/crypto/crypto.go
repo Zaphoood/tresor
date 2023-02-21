@@ -54,6 +54,7 @@ func DecryptAES(ciphertext, key, iv []byte) ([]byte, error) {
 	plaintext := make([]byte, len(ciphertext))
 	mode := cipher.NewCBCDecrypter(cfr, iv)
 	mode.CryptBlocks(plaintext, ciphertext)
+
 	padder := padding.NewPkcs7Padding(aes.BlockSize)
 	unpadded, err := padder.Unpad(plaintext)
 	if err != nil {

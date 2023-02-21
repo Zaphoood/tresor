@@ -62,7 +62,7 @@ func validHeaderCode(c headerCode) bool {
 var (
 	AES_CIPHER_ID [16]byte = [16]byte{0x31, 0xC1, 0xF2, 0xE6, 0xBF, 0x71, 0x43, 0x50, 0xBE, 0x58, 0x05, 0x21, 0x6A, 0xFC, 0x5A, 0xFF}
 	// KeePass files contain this sequence as the data for the final header field, we just copy that behavior
-	EOH_DATA      [4]byte  = [4]byte{0x0d, 0x0a, 0x0d, 0x0a}
+	EOH_DATA [4]byte = [4]byte{0x0d, 0x0a, 0x0d, 0x0a}
 )
 
 const (
@@ -93,12 +93,33 @@ type header struct {
 	irsid              IRSID
 }
 
-func newHeader(encryptionIVLength int) header {
+func (h *header) Copy() *header {
+	newHeader := header{
+		compression:      h.compression,
+		masterSeed:       make([]byte, len(h.masterSeed)),
+		transformSeed:    make([]byte, len(h.transformSeed)),
+		transformRounds:  h.transformRounds,
+		encryptionIV:     make([]byte, len(h.encryptionIV)),
+		streamStartBytes: make([]byte, len(h.streamStartBytes)),
+		irsid:            h.irsid,
+	}
+	copy(newHeader.masterSeed, h.masterSeed)
+	copy(newHeader.transformSeed, h.transformSeed)
+	copy(newHeader.encryptionIV, h.encryptionIV)
+	copy(newHeader.streamStartBytes, h.streamStartBytes)
+
+	return &newHeader
+}
+
+func newHeader(compression bool, transformRounds uint64, irsid IRSID, encryptionIVLength int) header {
 	return header{
+		compression:      compression,
 		masterSeed:       make([]byte, MASTER_SEED_LEN),
 		transformSeed:    make([]byte, TRANSFORM_SEED_LEN),
+		transformRounds:  transformRounds,
 		encryptionIV:     make([]byte, encryptionIVLength),
 		streamStartBytes: make([]byte, STREAM_START_BYTES_LEN),
+		irsid:            irsid,
 	}
 }
 

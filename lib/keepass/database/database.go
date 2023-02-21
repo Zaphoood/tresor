@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"sort"
 
@@ -355,39 +354,41 @@ func (d *Database) Save() error {
 }
 
 func (d *Database) SaveToPath(path string) error {
+	// TODO: Store header hash
 	if d.parsed == nil {
 		return errors.New("Tried to save database to file but parsed is nil")
 	}
-	h := newHeader(aes.BlockSize)
-	h.randomize()
+	header := d.header.Copy()
+	header.randomize()
 
 	// FIXME: Use Sha256 of protected stream key
-	xml, err := parser.Unparse(d.parsed, h.protectedStreamKey)
+	xml, err := parser.Unparse(d.parsed, header.protectedStreamKey)
 	if err != nil {
 		return err
 	}
-	//os.WriteFile("../../../saved.xml", xml, 0666)
 
 	// Make plaintext blocks
 	plainBlocks, err := formatBocks(&xml)
 	if err != nil {
 		return err
 	}
-	// Encrypt
 
-	masterKey, err := crypto.GenerateMasterKey(d.password, h.masterSeed, h.transformSeed, d.header.transformRounds)
-
+	masterKey, err := crypto.GenerateMasterKey(d.password, header.masterSeed, header.transformSeed, d.header.transformRounds)
 	if err != nil {
 		return err
 	}
-	encrypted, err := crypto.EncryptAES(*plainBlocks, masterKey, h.encryptionIV)
+
+	plaintext := make([]byte, 0, len(header.streamStartBytes)+len(*plainBlocks))
+	plaintext = append(plaintext, header.streamStartBytes...)
+	plaintext = append(plaintext, *plainBlocks...)
+	ciphertext, err := crypto.EncryptAES(plaintext, masterKey, header.encryptionIV)
 	if err != nil {
 		return err
 	}
-	log.Printf("Encrypted: %x ...", encrypted[:64])
 
-	// Open file
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	defer f.Close()
+
 	err = util.WriteAssert(f, FILE_SIGNATURE[:])
 	if err != nil {
 		return err
@@ -400,12 +401,11 @@ func (d *Database) SaveToPath(path string) error {
 	if err != nil {
 		return err
 	}
-	// Write header
-	err = h.write(f)
+	err = header.write(f)
 	if err != nil {
 		return err
 	}
-	// Write ciphertext
+	f.Write(ciphertext)
 
 	return nil
 }
