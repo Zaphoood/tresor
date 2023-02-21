@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+
+	"github.com/Zaphoood/tresor/lib/keepass/util"
 )
 
 const (
@@ -18,6 +20,7 @@ const (
 	TRANSFORM_SEED_LEN          = 32
 	INNER_RANDOM_STREAM_KEY_LEN = 32
 	STREAM_START_BYTES_LEN      = 32
+	MAX_UINT16                  = ^uint16(0)
 )
 
 type headerCode uint8
@@ -57,9 +60,9 @@ func validHeaderCode(c headerCode) bool {
 }
 
 var (
-	FILE_SIGNATURE    [4]byte  = [4]byte{0x03, 0xD9, 0xA2, 0x9A}
-	VERSION_SIGNATURE [4]byte  = [4]byte{0x67, 0xFB, 0x4B, 0xB5}
-	AES_CIPHER_ID     [16]byte = [16]byte{0x31, 0xC1, 0xF2, 0xE6, 0xBF, 0x71, 0x43, 0x50, 0xBE, 0x58, 0x05, 0x21, 0x6A, 0xFC, 0x5A, 0xFF}
+	AES_CIPHER_ID [16]byte = [16]byte{0x31, 0xC1, 0xF2, 0xE6, 0xBF, 0x71, 0x43, 0x50, 0xBE, 0x58, 0x05, 0x21, 0x6A, 0xFC, 0x5A, 0xFF}
+	// KeePass files contain this sequence as the data for the final header field, we just copy that behavior
+	EOH_DATA      [4]byte  = [4]byte{0x0d, 0x0a, 0x0d, 0x0a}
 )
 
 const (
@@ -80,14 +83,14 @@ func validIRSID(id uint32) bool {
 }
 
 type header struct {
-	gzipCompression    bool
+	compression        bool
 	masterSeed         []byte
 	transformSeed      []byte
 	transformRounds    uint64
 	encryptionIV       []byte
 	protectedStreamKey [32]byte
 	streamStartBytes   []byte
-	irs                IRSID
+	irsid              IRSID
 }
 
 func newHeader(encryptionIVLength int) header {
@@ -121,6 +124,7 @@ func (h *header) read(stream io.Reader) error {
 		if err != nil {
 			return err
 		}
+		// TODO: Create ReadAssert util method
 		if read != len(bufType) {
 			return FileError{errors.New("File truncated")}
 		}
@@ -155,19 +159,17 @@ func (h *header) read(stream io.Reader) error {
 		return FileError{errors.New("Invalid or unsupported cipher")}
 	}
 
-	switch flag := binary.LittleEndian.Uint32(headerMap[CompressionFlag]); flag {
-	case COMPRESSION_None:
-		h.gzipCompression = false
-	case COMPRESSION_GZip:
-		h.gzipCompression = true
-	default:
-		return FileError{fmt.Errorf("Unknown compression flag: %d", flag)}
+	var err error
+	h.compression, err = getCompression(headerMap[CompressionFlag])
+	if err != nil {
+		return nil
 	}
 
 	h.masterSeed = headerMap[MasterSeed]
 	h.transformSeed = headerMap[TransformSeed]
 	h.transformRounds = binary.LittleEndian.Uint64(headerMap[TransformRounds])
 	h.encryptionIV = headerMap[EncryptionIV]
+	// TODO: Store raw value here and take sha256 later
 	h.protectedStreamKey = sha256.Sum256(headerMap[ProtectedStreamKey])
 	h.streamStartBytes = headerMap[StreamStartBytes]
 
@@ -175,7 +177,77 @@ func (h *header) read(stream io.Reader) error {
 	if !validIRSID(irsid) {
 		return FileError{fmt.Errorf("Invalid Inner Random Stream ID: %d", irsid)}
 	}
-	h.irs = IRSID(irsid)
+	h.irsid = IRSID(irsid)
 
 	return nil
+}
+
+func (h *header) write(stream io.Writer) error {
+	compressionFlag := getCompressionFlag(h.compression)
+
+	transformRoundsBuf := make([]byte, QWORD)
+	binary.LittleEndian.PutUint64(transformRoundsBuf, h.transformRounds)
+	irsBuf := make([]byte, DWORD)
+	binary.LittleEndian.PutUint32(irsBuf, uint32(h.irsid))
+
+	fields := []struct {
+		id   headerCode
+		data []byte
+	}{
+		{CipherID, AES_CIPHER_ID[:]},
+		{CompressionFlag, compressionFlag},
+		{MasterSeed, h.masterSeed},
+		{TransformSeed, h.transformSeed},
+		{TransformRounds, transformRoundsBuf},
+		{EncryptionIV, h.encryptionIV},
+		{ProtectedStreamKey, h.protectedStreamKey[:]},
+		{StreamStartBytes, h.streamStartBytes},
+		{InnerRandomStreamID, irsBuf},
+		{EOH, EOH_DATA[:]},
+	}
+	for _, field := range fields {
+		err := writeHeaderField(stream, field.id, field.data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeHeaderField(stream io.Writer, id headerCode, data []byte) error {
+	if len(data) > int(MAX_UINT16) {
+		return fmt.Errorf("Header field exceeds maximum length: %d > %d", len(data), MAX_UINT16)
+	}
+	lengthBuf := make([]byte, WORD)
+	binary.LittleEndian.PutUint16(lengthBuf, uint16(len(data)))
+	err := util.WriteAssert(stream, []byte{byte(id)})
+	if err != nil {
+		return err
+	}
+	err = util.WriteAssert(stream, lengthBuf)
+	if err != nil {
+		return err
+	}
+	return util.WriteAssert(stream, data)
+}
+
+func getCompression(compressionFlag []byte) (bool, error) {
+	switch flag := binary.LittleEndian.Uint32(compressionFlag); flag {
+	case COMPRESSION_None:
+		return false, nil
+	case COMPRESSION_GZip:
+		return true, nil
+	default:
+		return false, FileError{fmt.Errorf("Unknown compression flag: %d", flag)}
+	}
+}
+
+func getCompressionFlag(compression bool) []byte {
+	buf := make([]byte, DWORD)
+	flag := uint32(COMPRESSION_None)
+	if compression {
+		flag = COMPRESSION_GZip
+	}
+	binary.LittleEndian.PutUint32(buf, flag)
+	return buf
 }

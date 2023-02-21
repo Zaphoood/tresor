@@ -79,7 +79,7 @@ func TestLoadSave(t *testing.T) {
 	if !assert.Nil(d.Parse()) {
 		return
 	}
-	assert.Nil(d.SaveToPath("out.kdbx"))
+	assert.Nil(d.SaveToPath("../../../saved.kdbx"))
 }
 
 func TestErrors(t *testing.T) {

@@ -23,6 +23,12 @@ const (
 	SHA256_DIGEST_LEN = 32
 	WORD              = 2
 	DWORD             = 4
+	QWORD             = 8
+)
+
+var (
+	FILE_SIGNATURE    [4]byte = [4]byte{0x03, 0xD9, 0xA2, 0x9A}
+	VERSION_SIGNATURE [4]byte = [4]byte{0x67, 0xFB, 0x4B, 0xB5}
 )
 
 type block struct {
@@ -55,6 +61,22 @@ func (v *version) read(r io.Reader) error {
 		return errors.New("File truncated")
 	}
 	v.major = binary.LittleEndian.Uint16(buf)
+
+	return nil
+}
+
+func (v *version) write(w io.Writer) error {
+	buf := make([]byte, WORD)
+	binary.LittleEndian.PutUint16(buf, v.minor)
+	err := util.WriteAssert(w, buf)
+	if err != nil {
+		return err
+	}
+	binary.LittleEndian.PutUint16(buf, v.major)
+	err = util.WriteAssert(w, buf)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -164,6 +186,7 @@ func (d *Database) Load() error {
 		return err
 	}
 
+	// TODO: Use io.SeekCurrent, io.SeekStart instead
 	headerLength, err := f.Seek(0, 1)
 	if err != nil {
 		return err
@@ -209,7 +232,7 @@ func (d *Database) Decrypt() error {
 	}
 	d.plaintext = *plaintext
 
-	if d.header.gzipCompression {
+	if d.header.compression {
 		out, err := util.Unzip(&d.plaintext)
 		d.plaintext = *out
 		if err != nil {
@@ -338,6 +361,7 @@ func (d *Database) SaveToPath(path string) error {
 	h := newHeader(aes.BlockSize)
 	h.randomize()
 
+	// FIXME: Use Sha256 of protected stream key
 	xml, err := parser.Unparse(d.parsed, h.protectedStreamKey)
 	if err != nil {
 		return err
@@ -349,21 +373,39 @@ func (d *Database) SaveToPath(path string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Blocks: %x\n\n...\n\n%x", (*plainBlocks)[:64], (*plainBlocks)[len(*plainBlocks)-64:])
 	// Encrypt
 
 	masterKey, err := crypto.GenerateMasterKey(d.password, h.masterSeed, h.transformSeed, d.header.transformRounds)
-	encrypted, err := crypto.EncryptAES(*plainBlocks, masterKey, h.encryptionIV)
-
-	log.Printf("'%x'\n", encrypted[:64])
-
-	// Open file
-	// Write header
-	// Write ciphertext
 
 	if err != nil {
 		return err
 	}
+	encrypted, err := crypto.EncryptAES(*plainBlocks, masterKey, h.encryptionIV)
+	if err != nil {
+		return err
+	}
+	log.Printf("Encrypted: %x ...", encrypted[:64])
+
+	// Open file
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	err = util.WriteAssert(f, FILE_SIGNATURE[:])
+	if err != nil {
+		return err
+	}
+	err = util.WriteAssert(f, VERSION_SIGNATURE[:])
+	if err != nil {
+		return err
+	}
+	d.version.write(f)
+	if err != nil {
+		return err
+	}
+	// Write header
+	err = h.write(f)
+	if err != nil {
+		return err
+	}
+	// Write ciphertext
 
 	return nil
 }

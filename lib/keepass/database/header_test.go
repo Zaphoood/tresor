@@ -9,10 +9,10 @@ import (
 func TestRandomizeHeader(t *testing.T) {
 	assert := assert.New(t)
 
-	h1 := newHeader(8);
-	h2 := newHeader(8);
-	h1.randomize();
-	h2.randomize();
+	h1 := newHeader(8)
+	h2 := newHeader(8)
+	h1.randomize()
+	h2.randomize()
 	assert.NotEqual(h1.masterSeed, h2.masterSeed)
 	assert.NotEqual(h1.transformSeed, h2.transformSeed)
 	assert.NotEqual(h1.encryptionIV, h2.encryptionIV)
