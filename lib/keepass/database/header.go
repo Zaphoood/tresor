@@ -3,11 +3,13 @@ package database
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"os"
 
 	"github.com/Zaphoood/tresor/lib/keepass/util"
 )
@@ -63,7 +65,7 @@ var (
 	VERSION_SIGNATURE [4]byte  = [4]byte{0x67, 0xFB, 0x4B, 0xB5}
 	AES_CIPHER_ID     [16]byte = [16]byte{0x31, 0xC1, 0xF2, 0xE6, 0xBF, 0x71, 0x43, 0x50, 0xBE, 0x58, 0x05, 0x21, 0x6A, 0xFC, 0x5A, 0xFF}
 	// KeePass files contain this sequence as the data for the final header field, we just copy that behavior
-	EOH_DATA          [4]byte  = [4]byte{0x0d, 0x0a, 0x0d, 0x0a}
+	EOH_DATA [4]byte = [4]byte{0x0d, 0x0a, 0x0d, 0x0a}
 )
 
 const (
@@ -138,6 +140,8 @@ type header struct {
 	innerRandomStreamKey []byte
 	streamStartBytes     []byte
 	irsid                IRSID
+	// Hash of the raw data that was read from disk during call to `header.read()`
+	hashOfRead [SHA256_DIGEST_LEN]byte
 }
 
 func (h *header) Copy() *header {
@@ -181,7 +185,9 @@ func (h *header) randomize() {
 	rand.Read(h.innerRandomStreamKey[:])
 }
 
-func (h *header) read(stream io.Reader) error {
+func (h *header) read(stream *os.File) error {
+	startOfHeader, err := stream.Seek(0, io.SeekCurrent)
+
 	// Check filetype signature
 	eq, err := util.ReadCompare(stream, FILE_SIGNATURE[:])
 	if err != nil {
@@ -242,7 +248,20 @@ func (h *header) read(stream io.Reader) error {
 		headerMap[htype] = value
 	}
 
-	// Parse headers
+	// Store hash
+	endOfHeader, err := stream.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if _, err = stream.Seek(startOfHeader, io.SeekStart); err != nil {
+		return err
+	}
+	headerLength := endOfHeader - startOfHeader
+	headerRaw := make([]byte, headerLength)
+	stream.Read(headerRaw)
+	h.hashOfRead = sha256.Sum256(headerRaw)
+
+	// Parse header fields
 	for _, h := range obligatoryFields {
 		if _, present := headerMap[h]; !present {
 			return FileError{fmt.Errorf("Missing header with code %d", h)}
@@ -274,18 +293,20 @@ func (h *header) read(stream io.Reader) error {
 	return nil
 }
 
-func (h *header) write(stream io.Writer) error {
-	err := util.WriteAssert(stream, FILE_SIGNATURE[:])
+// Write header to stream and return hash of bytes that were written
+func (h *header) write(stream io.Writer) ([SHA256_DIGEST_LEN]byte, error) {
+	buf := new(bytes.Buffer)
+	err := util.WriteAssert(buf, FILE_SIGNATURE[:])
 	if err != nil {
-		return err
+		return [SHA256_DIGEST_LEN]byte{}, err
 	}
-	err = util.WriteAssert(stream, VERSION_SIGNATURE[:])
+	err = util.WriteAssert(buf, VERSION_SIGNATURE[:])
 	if err != nil {
-		return err
+		return [SHA256_DIGEST_LEN]byte{}, err
 	}
-	h.version.write(stream)
+	h.version.write(buf)
 	if err != nil {
-		return err
+		return [SHA256_DIGEST_LEN]byte{}, err
 	}
 
 	compressionFlag := getCompressionFlag(h.compression)
@@ -311,12 +332,15 @@ func (h *header) write(stream io.Writer) error {
 		{EOH, EOH_DATA[:]},
 	}
 	for _, field := range fields {
-		err := writeHeaderField(stream, field.id, field.data)
+		err := writeHeaderField(buf, field.id, field.data)
 		if err != nil {
-			return err
+			return [SHA256_DIGEST_LEN]byte{}, err
 		}
 	}
-	return nil
+	raw, _ := io.ReadAll(buf)
+	hash := sha256.Sum256(raw)
+	stream.Write(raw)
+	return hash, nil
 }
 
 func writeHeaderField(stream io.Writer, id headerCode, data []byte) error {

@@ -63,10 +63,9 @@ func (e BlockSizeError) Error() string {
 }
 
 type Database struct {
-	path       string
-	password   string
-	header     header
-	headerHash [SHA256_DIGEST_LEN]byte
+	path     string
+	password string
+	header   header
 
 	ciphertext []byte
 	plaintext  []byte
@@ -110,19 +109,6 @@ func (d *Database) Load() error {
 	if err != nil {
 		return err
 	}
-
-	// TODO: Use io.SeekCurrent, io.SeekStart instead
-	headerLength, err := f.Seek(0, 1)
-	if err != nil {
-		return err
-	}
-	headerRaw := make([]byte, headerLength)
-	_, err = f.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-	f.Read(headerRaw)
-	d.headerHash = sha256.Sum256(headerRaw)
 
 	d.ciphertext, err = ioutil.ReadAll(f)
 	if err != nil {
@@ -266,13 +252,14 @@ func (d *Database) VerifyHeaderHash() (bool, error) {
 	if len(d.parsed.Meta.HeaderHash) == 0 {
 		return false, errors.New("No header hash found in XML")
 	}
+	// TODO: Use base64.StdEncoding.DecodeString for brevity
 	storedHashEnc := []byte(d.parsed.Meta.HeaderHash)
 	storedHash := make([]byte, base64.StdEncoding.DecodedLen(len(storedHashEnc)))
 	length, err := base64.StdEncoding.Decode(storedHash, storedHashEnc)
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(d.headerHash[:], storedHash[:length]), nil
+	return bytes.Equal(d.header.hashOfRead[:], storedHash[:length]), nil
 }
 
 func (d *Database) Save() error {
@@ -286,6 +273,15 @@ func (d *Database) SaveToPath(path string) error {
 	}
 	header := d.header.Copy()
 	header.randomize()
+
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	defer f.Close()
+	hash, err := header.write(f)
+	if err != nil {
+		return err
+	}
+
+	d.parsed.Meta.HeaderHash = base64.StdEncoding.EncodeToString(hash[:])
 
 	xml, err := parser.Unparse(d.parsed, sha256.Sum256(header.innerRandomStreamKey))
 	if err != nil {
@@ -311,12 +307,6 @@ func (d *Database) SaveToPath(path string) error {
 		return err
 	}
 
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
-	defer f.Close()
-	err = header.write(f)
-	if err != nil {
-		return err
-	}
 	_, err = f.Write(ciphertext)
 	return err
 }
