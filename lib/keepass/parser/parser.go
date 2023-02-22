@@ -184,10 +184,10 @@ type String struct {
 	Value   wrappers.Value
 }
 
-func Parse(b []byte, key [32]byte) (*Document, error) {
+func Parse(b []byte, innerRandomStreamKey [32]byte) (*Document, error) {
 	p := NewDocument()
 
-	salsa := crypto.NewSalsa20Stream(key)
+	salsa := crypto.NewSalsa20Stream(innerRandomStreamKey)
 	wrappers.SetInnerRandomStream(salsa)
 	err := xml.Unmarshal(b, &p)
 	if err != nil {

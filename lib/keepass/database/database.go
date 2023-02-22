@@ -328,7 +328,7 @@ func formatBocks(in *[]byte) (*[]byte, error) {
 
 func (d *Database) Parse() error {
 	var err error
-	d.parsed, err = parser.Parse(d.plaintext, d.header.protectedStreamKey)
+	d.parsed, err = parser.Parse(d.plaintext, sha256.Sum256(d.header.innerRandomStreamKey))
 	if err != nil {
 		return err
 	}
@@ -361,8 +361,7 @@ func (d *Database) SaveToPath(path string) error {
 	header := d.header.Copy()
 	header.randomize()
 
-	// FIXME: Use Sha256 of protected stream key
-	xml, err := parser.Unparse(d.parsed, header.protectedStreamKey)
+	xml, err := parser.Unparse(d.parsed, sha256.Sum256(header.innerRandomStreamKey))
 	if err != nil {
 		return err
 	}

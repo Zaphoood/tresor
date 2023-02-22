@@ -17,5 +17,5 @@ func TestRandomizeHeader(t *testing.T) {
 	assert.NotEqual(h1.transformSeed, h2.transformSeed)
 	assert.NotEqual(h1.encryptionIV, h2.encryptionIV)
 	assert.NotEqual(h1.streamStartBytes, h2.streamStartBytes)
-	assert.NotEqual(h1.protectedStreamKey, h2.protectedStreamKey)
+	assert.NotEqual(h1.innerRandomStreamKey, h2.innerRandomStreamKey)
 }

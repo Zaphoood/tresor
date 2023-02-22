@@ -3,7 +3,6 @@ package database
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -83,29 +82,31 @@ func validIRSID(id uint32) bool {
 }
 
 type header struct {
-	compression        bool
-	masterSeed         []byte
-	transformSeed      []byte
-	transformRounds    uint64
-	encryptionIV       []byte
-	protectedStreamKey [32]byte
-	streamStartBytes   []byte
-	irsid              IRSID
+	compression          bool
+	masterSeed           []byte
+	transformSeed        []byte
+	transformRounds      uint64
+	encryptionIV         []byte
+	innerRandomStreamKey []byte
+	streamStartBytes     []byte
+	irsid                IRSID
 }
 
 func (h *header) Copy() *header {
 	newHeader := header{
-		compression:      h.compression,
-		masterSeed:       make([]byte, len(h.masterSeed)),
-		transformSeed:    make([]byte, len(h.transformSeed)),
-		transformRounds:  h.transformRounds,
-		encryptionIV:     make([]byte, len(h.encryptionIV)),
-		streamStartBytes: make([]byte, len(h.streamStartBytes)),
-		irsid:            h.irsid,
+		compression:          h.compression,
+		masterSeed:           make([]byte, len(h.masterSeed)),
+		transformSeed:        make([]byte, len(h.transformSeed)),
+		transformRounds:      h.transformRounds,
+		encryptionIV:         make([]byte, len(h.encryptionIV)),
+		innerRandomStreamKey: make([]byte, len(h.innerRandomStreamKey)),
+		streamStartBytes:     make([]byte, len(h.streamStartBytes)),
+		irsid:                h.irsid,
 	}
 	copy(newHeader.masterSeed, h.masterSeed)
 	copy(newHeader.transformSeed, h.transformSeed)
 	copy(newHeader.encryptionIV, h.encryptionIV)
+	copy(newHeader.innerRandomStreamKey, h.innerRandomStreamKey)
 	copy(newHeader.streamStartBytes, h.streamStartBytes)
 
 	return &newHeader
@@ -113,13 +114,14 @@ func (h *header) Copy() *header {
 
 func newHeader(compression bool, transformRounds uint64, irsid IRSID, encryptionIVLength int) header {
 	return header{
-		compression:      compression,
-		masterSeed:       make([]byte, MASTER_SEED_LEN),
-		transformSeed:    make([]byte, TRANSFORM_SEED_LEN),
-		transformRounds:  transformRounds,
-		encryptionIV:     make([]byte, encryptionIVLength),
-		streamStartBytes: make([]byte, STREAM_START_BYTES_LEN),
-		irsid:            irsid,
+		compression:          compression,
+		masterSeed:           make([]byte, MASTER_SEED_LEN),
+		transformSeed:        make([]byte, TRANSFORM_SEED_LEN),
+		transformRounds:      transformRounds,
+		encryptionIV:         make([]byte, encryptionIVLength),
+		innerRandomStreamKey: make([]byte, INNER_RANDOM_STREAM_KEY_LEN),
+		streamStartBytes:     make([]byte, STREAM_START_BYTES_LEN),
+		irsid:                irsid,
 	}
 }
 
@@ -128,7 +130,7 @@ func (h *header) randomize() {
 	rand.Read(h.transformSeed)
 	rand.Read(h.encryptionIV)
 	rand.Read(h.streamStartBytes)
-	rand.Read(h.protectedStreamKey[:])
+	rand.Read(h.innerRandomStreamKey[:])
 }
 
 func (h *header) read(stream io.Reader) error {
@@ -190,8 +192,7 @@ func (h *header) read(stream io.Reader) error {
 	h.transformSeed = headerMap[TransformSeed]
 	h.transformRounds = binary.LittleEndian.Uint64(headerMap[TransformRounds])
 	h.encryptionIV = headerMap[EncryptionIV]
-	// TODO: Store raw value here and take sha256 later
-	h.protectedStreamKey = sha256.Sum256(headerMap[ProtectedStreamKey])
+	h.innerRandomStreamKey = headerMap[ProtectedStreamKey]
 	h.streamStartBytes = headerMap[StreamStartBytes]
 
 	irsid := binary.LittleEndian.Uint32(headerMap[InnerRandomStreamID])
@@ -221,7 +222,7 @@ func (h *header) write(stream io.Writer) error {
 		{TransformSeed, h.transformSeed},
 		{TransformRounds, transformRoundsBuf},
 		{EncryptionIV, h.encryptionIV},
-		{ProtectedStreamKey, h.protectedStreamKey[:]},
+		{ProtectedStreamKey, h.innerRandomStreamKey[:]},
 		{StreamStartBytes, h.streamStartBytes},
 		{InnerRandomStreamID, irsBuf},
 		{EOH, EOH_DATA[:]},
