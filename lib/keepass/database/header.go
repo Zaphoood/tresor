@@ -59,9 +59,11 @@ func validHeaderCode(c headerCode) bool {
 }
 
 var (
-	AES_CIPHER_ID [16]byte = [16]byte{0x31, 0xC1, 0xF2, 0xE6, 0xBF, 0x71, 0x43, 0x50, 0xBE, 0x58, 0x05, 0x21, 0x6A, 0xFC, 0x5A, 0xFF}
+	FILE_SIGNATURE    [4]byte  = [4]byte{0x03, 0xD9, 0xA2, 0x9A}
+	VERSION_SIGNATURE [4]byte  = [4]byte{0x67, 0xFB, 0x4B, 0xB5}
+	AES_CIPHER_ID     [16]byte = [16]byte{0x31, 0xC1, 0xF2, 0xE6, 0xBF, 0x71, 0x43, 0x50, 0xBE, 0x58, 0x05, 0x21, 0x6A, 0xFC, 0x5A, 0xFF}
 	// KeePass files contain this sequence as the data for the final header field, we just copy that behavior
-	EOH_DATA [4]byte = [4]byte{0x0d, 0x0a, 0x0d, 0x0a}
+	EOH_DATA          [4]byte  = [4]byte{0x0d, 0x0a, 0x0d, 0x0a}
 )
 
 const (
@@ -81,7 +83,53 @@ func validIRSID(id uint32) bool {
 	return IRS_None <= id && id <= IRS_Salsa20
 }
 
+type version struct {
+	major uint16
+	minor uint16
+}
+
+func (v *version) read(r io.Reader) error {
+	buf := make([]byte, WORD)
+
+	read, err := r.Read(buf)
+	if err != nil {
+		return err
+	}
+	if read != len(buf) {
+		return errors.New("File truncated")
+	}
+	v.minor = binary.LittleEndian.Uint16(buf)
+
+	read, err = r.Read(buf)
+	if err != nil {
+		return err
+	}
+	if read != len(buf) {
+		return errors.New("File truncated")
+	}
+	v.major = binary.LittleEndian.Uint16(buf)
+
+	return nil
+}
+
+func (v *version) write(w io.Writer) error {
+	buf := make([]byte, WORD)
+	binary.LittleEndian.PutUint16(buf, v.minor)
+	err := util.WriteAssert(w, buf)
+	if err != nil {
+		return err
+	}
+	binary.LittleEndian.PutUint16(buf, v.major)
+	err = util.WriteAssert(w, buf)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type header struct {
+	version              version
 	compression          bool
 	masterSeed           []byte
 	transformSeed        []byte
@@ -134,6 +182,29 @@ func (h *header) randomize() {
 }
 
 func (h *header) read(stream io.Reader) error {
+	// Check filetype signature
+	eq, err := util.ReadCompare(stream, FILE_SIGNATURE[:])
+	if err != nil {
+		return err
+	}
+	if !eq {
+		return FileError{errors.New("Invalid file signature")}
+	}
+
+	// Check KeePass version signature
+	eq, err = util.ReadCompare(stream, VERSION_SIGNATURE[:])
+	if err != nil {
+		return err
+	}
+	if !eq {
+		return FileError{errors.New("Invalid or unsupported version signature")}
+	}
+
+	err = h.version.read(stream)
+	if err != nil {
+		return err
+	}
+
 	headerMap := make(map[headerCode][]byte)
 	bufType := make([]byte, TLV_TYPE_LEN)
 	bufLength := make([]byte, TLV_LENGTH_LEN)
@@ -182,7 +253,6 @@ func (h *header) read(stream io.Reader) error {
 		return FileError{errors.New("Invalid or unsupported cipher")}
 	}
 
-	var err error
 	h.compression, err = getCompression(headerMap[CompressionFlag])
 	if err != nil {
 		return nil
@@ -205,6 +275,19 @@ func (h *header) read(stream io.Reader) error {
 }
 
 func (h *header) write(stream io.Writer) error {
+	err := util.WriteAssert(stream, FILE_SIGNATURE[:])
+	if err != nil {
+		return err
+	}
+	err = util.WriteAssert(stream, VERSION_SIGNATURE[:])
+	if err != nil {
+		return err
+	}
+	h.version.write(stream)
+	if err != nil {
+		return err
+	}
+
 	compressionFlag := getCompressionFlag(h.compression)
 
 	transformRoundsBuf := make([]byte, QWORD)

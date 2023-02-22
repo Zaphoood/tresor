@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -18,6 +17,7 @@ import (
 	"github.com/Zaphoood/tresor/lib/keepass/util"
 )
 
+// TODO: Consider moving constants to a separate file
 const (
 	SHA256_DIGEST_LEN = 32
 	WORD              = 2
@@ -25,59 +25,9 @@ const (
 	QWORD             = 8
 )
 
-var (
-	FILE_SIGNATURE    [4]byte = [4]byte{0x03, 0xD9, 0xA2, 0x9A}
-	VERSION_SIGNATURE [4]byte = [4]byte{0x67, 0xFB, 0x4B, 0xB5}
-)
-
 type block struct {
 	start  int
 	length int
-}
-
-type version struct {
-	major uint16
-	minor uint16
-}
-
-func (v *version) read(r io.Reader) error {
-	buf := make([]byte, WORD)
-
-	read, err := r.Read(buf)
-	if err != nil {
-		return err
-	}
-	if read != len(buf) {
-		return errors.New("File truncated")
-	}
-	v.minor = binary.LittleEndian.Uint16(buf)
-
-	read, err = r.Read(buf)
-	if err != nil {
-		return err
-	}
-	if read != len(buf) {
-		return errors.New("File truncated")
-	}
-	v.major = binary.LittleEndian.Uint16(buf)
-
-	return nil
-}
-
-func (v *version) write(w io.Writer) error {
-	buf := make([]byte, WORD)
-	binary.LittleEndian.PutUint16(buf, v.minor)
-	err := util.WriteAssert(w, buf)
-	if err != nil {
-		return err
-	}
-	binary.LittleEndian.PutUint16(buf, v.major)
-	err = util.WriteAssert(w, buf)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 type FileError struct {
@@ -115,7 +65,6 @@ func (e BlockSizeError) Error() string {
 type Database struct {
 	path       string
 	password   string
-	version    version
 	header     header
 	headerHash [SHA256_DIGEST_LEN]byte
 
@@ -147,35 +96,12 @@ func (d Database) Parsed() *parser.Document {
 }
 
 func (d Database) Version() version {
-	return d.version
+	return d.header.version
 }
 
 func (d *Database) Load() error {
 	f, err := os.Open(d.path)
 	defer f.Close()
-	if err != nil {
-		return err
-	}
-
-	// Check filetype signature
-	eq, err := util.ReadCompare(f, FILE_SIGNATURE[:])
-	if err != nil {
-		return err
-	}
-	if !eq {
-		return FileError{errors.New("Invalid file signature")}
-	}
-
-	// Check KeePass version signature
-	eq, err = util.ReadCompare(f, VERSION_SIGNATURE[:])
-	if err != nil {
-		return err
-	}
-	if !eq {
-		return FileError{errors.New("Invalid or unsupported version signature")}
-	}
-
-	err = d.version.read(f)
 	if err != nil {
 		return err
 	}
@@ -387,24 +313,10 @@ func (d *Database) SaveToPath(path string) error {
 
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 	defer f.Close()
-
-	err = util.WriteAssert(f, FILE_SIGNATURE[:])
-	if err != nil {
-		return err
-	}
-	err = util.WriteAssert(f, VERSION_SIGNATURE[:])
-	if err != nil {
-		return err
-	}
-	d.version.write(f)
-	if err != nil {
-		return err
-	}
 	err = header.write(f)
 	if err != nil {
 		return err
 	}
-	f.Write(ciphertext)
-
-	return nil
+	_, err = f.Write(ciphertext)
+	return err
 }
