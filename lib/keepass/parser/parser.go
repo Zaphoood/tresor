@@ -127,7 +127,8 @@ type Entry struct {
 	Strings         []String          `xml:"String"`
 	BinaryRefs      []BinaryReference `xml:"Binary"`
 	AutoType        AutoType
-	History         []Entry `xml:"History>Entry"`
+	// History must be pointer to slice in order for omitempty to work for nested elements
+	History         *[]Entry `xml:"History>Entry,omitempty"`
 }
 
 type Times struct {
@@ -156,8 +157,8 @@ type AutoType struct {
 }
 
 type Association struct {
-	Window            string `xml:",omitempty"`
-	KeystrokeSequence string `xml:",omitempty"`
+	Window            string
+	KeystrokeSequence string
 }
 
 func (e *Entry) Get(key string) (wrappers.Value, error) {
