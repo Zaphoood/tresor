@@ -140,6 +140,7 @@ type header struct {
 
 func (h *header) Copy() *header {
 	newHeader := header{
+		version:              h.version,
 		compression:          h.compression,
 		masterSeed:           make([]byte, len(h.masterSeed)),
 		transformSeed:        make([]byte, len(h.transformSeed)),
@@ -158,7 +159,7 @@ func (h *header) Copy() *header {
 	return &newHeader
 }
 
-func newHeader(compression bool, transformRounds uint64, irsid IRSID, encryptionIVLength int) header {
+func newHeader(versionMajor int, versionMinor int, compression bool, transformRounds uint64, irsid IRSID, encryptionIVLength int) header {
 	return header{
 		compression:          compression,
 		masterSeed:           make([]byte, MASTER_SEED_LEN),

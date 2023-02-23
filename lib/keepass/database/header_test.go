@@ -9,8 +9,8 @@ import (
 func TestRandomizeHeader(t *testing.T) {
 	assert := assert.New(t)
 
-	h1 := newHeader(false, 10, IRSID(0), 8)
-	h2 := newHeader(false, 10, IRSID(0), 8)
+	h1 := newHeader(3, 1, false, 10, IRSID(0), 8)
+	h2 := newHeader(3, 1, false, 10, IRSID(0), 8)
 	h1.randomize()
 	h2.randomize()
 	assert.NotEqual(h1.masterSeed, h2.masterSeed)
