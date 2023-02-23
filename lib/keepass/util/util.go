@@ -17,22 +17,34 @@ func ReadCompare(f io.Reader, b []byte) (bool, error) {
 	return bytes.Equal(buf, b), nil
 }
 
-// WriteAssert writes to f and returns an error if writing failed
-func WriteAssert(f io.Writer, b []byte) error {
-	n, err := f.Write(b)
+// WriteAssert writes to f and errors if writing failed or if it wasn't possible to write all bytes
+func WriteAssert(w io.Writer, b []byte) error {
+	n, err := w.Write(b)
 	if err != nil {
 		return fmt.Errorf("Error while writing to file: %s", err)
 	}
 	if n != len(b) {
-		return fmt.Errorf("Tried to write %d bytes but wrote %d", len(b), n)
+		return fmt.Errorf("Writing failed: tried to write %d bytes but wrote only %d", len(b), n)
 	}
 	return nil
 }
 
-func Unzip(in *[]byte) (*[]byte, error) {
+// ReadAssert tries to read len(b) bytes and errors if reading failed or if less bytes were read
+func ReadAssert(r io.Reader, b []byte) error {
+	n, err := r.Read(b)
+	if err != nil {
+		return err
+	}
+	if n != len(b) {
+		return fmt.Errorf("File truncated: tried to read %d bytes but got only %d", len(b), n)
+	}
+	return nil
+}
+
+func Unzip(in []byte) ([]byte, error) {
 	out := make([]byte, 1024)
 	var outBuf bytes.Buffer
-	inBuf := bytes.NewBuffer(*in)
+	inBuf := bytes.NewBuffer(in)
 	r, err := gzip.NewReader(inBuf)
 	if err != nil {
 		return nil, err
@@ -47,6 +59,6 @@ func Unzip(in *[]byte) (*[]byte, error) {
 			return nil, err
 		}
 	}
-	outBytes := outBuf.Bytes()
-	return &outBytes, nil
+
+	return outBuf.Bytes(), nil
 }

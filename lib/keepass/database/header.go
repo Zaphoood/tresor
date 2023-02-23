@@ -93,21 +93,15 @@ type version struct {
 func (v *version) read(r io.Reader) error {
 	buf := make([]byte, WORD)
 
-	read, err := r.Read(buf)
+	err := util.ReadAssert(r, buf)
 	if err != nil {
 		return err
-	}
-	if read != len(buf) {
-		return errors.New("File truncated")
 	}
 	v.minor = binary.LittleEndian.Uint16(buf)
 
-	read, err = r.Read(buf)
+	err = util.ReadAssert(r, buf)
 	if err != nil {
 		return err
-	}
-	if read != len(buf) {
-		return errors.New("File truncated")
 	}
 	v.major = binary.LittleEndian.Uint16(buf)
 
@@ -220,25 +214,21 @@ func (h *header) read(stream *os.File) error {
 		value  []byte
 	)
 	for {
-		read, err := stream.Read(bufType)
+		err = util.ReadAssert(stream, bufType)
 		if err != nil {
 			return err
 		}
-		// TODO: Create ReadAssert util method
-		if read != len(bufType) {
-			return FileError{errors.New("File truncated")}
-		}
-		read, err = stream.Read(bufLength)
+		err = util.ReadAssert(stream, bufLength)
 		if err != nil {
 			return err
-		}
-		if read != len(bufLength) {
-			return FileError{errors.New("File truncated")}
 		}
 		htype = headerCode(bufType[0])
 		length = binary.LittleEndian.Uint16(bufLength)
 		value = make([]byte, length)
-		read, err = stream.Read(value)
+		err = util.ReadAssert(stream, value)
+		if err != nil {
+			return err
+		}
 		if htype == EOH {
 			break
 		}

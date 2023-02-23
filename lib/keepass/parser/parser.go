@@ -169,13 +169,13 @@ func (e *Entry) Get(key string) (wrappers.Value, error) {
 	return wrappers.Value{}, fmt.Errorf("No such key: %s", key)
 }
 
-func (e *Entry) TryGet(key, fallback string) wrappers.Value {
-	// TODO: Return a string instead of a value here
+// TryGet returns the value for the given key if it exists, fallback otherwise
+func (e *Entry) TryGet(key, fallback string) string {
 	result, err := e.Get(key)
 	if err != nil {
-		return wrappers.Value{Inner: fallback}
+		return fallback
 	}
-	return result
+	return result.Inner
 }
 
 type String struct {

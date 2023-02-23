@@ -185,7 +185,7 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 		t.uuids = append(t.uuids, group.UUID)
 	}
 	for _, entry := range entriesSorted {
-		title := entry.TryGet("Title", TITLE_PLACEH).Inner
+		title := entry.TryGet("Title", TITLE_PLACEH)
 		rows = append(rows, table.Row{title, ""})
 		t.uuids = append(t.uuids, entry.UUID)
 	}
@@ -197,8 +197,10 @@ func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	visited := make(map[string]struct{})
 	var value string
 	for _, field := range defaultFields {
-		r := entry.TryGet(field.key, field.defaultValue)
-		if r.Protected {
+		r, err := entry.Get(field.key)
+		if err != nil {
+			value = field.defaultValue
+		} else if r.Protected {
 			value = ENCRYPTED_PLACEH
 		} else {
 			value = r.Inner

@@ -8,7 +8,6 @@ import (
 )
 
 var (
-	// TODO: Use `xml.Header` from 'encoding/xml' instead
 	XML_HEADER      = []byte("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>")
 	KEEPASS_END_TAG = []byte("</KeePassFile>")
 )

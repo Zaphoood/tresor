@@ -46,7 +46,6 @@ func AESRounds(in, seed []byte, rounds uint64) ([]byte, error) {
 }
 
 func DecryptAES(ciphertext, key, iv []byte) ([]byte, error) {
-	// TODO: Consider passing `ciphertext` by reference (same for encrypt below)
 	cfr, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

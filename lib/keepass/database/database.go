@@ -128,24 +128,23 @@ func (d *Database) Decrypt() error {
 		return err
 	}
 
-	plainBlocks, err := crypto.DecryptAES(d.ciphertext, masterKey, d.header.encryptionIV)
+	plaintext, err := crypto.DecryptAES(d.ciphertext, masterKey, d.header.encryptionIV)
 	if err != nil {
 		return err
 	}
 
-	if !d.checkStreamStartBytes(&plainBlocks) {
+	if !d.checkStreamStartBytesAndTrim(&plaintext) {
 		return DecryptError{errors.New("Wrong password")}
 	}
 
-	plaintext, err := parseBlocks(&plainBlocks)
+	plaintext, err = parseBlocks(plaintext)
 	if err != nil {
 		return err
 	}
-	d.plaintext = *plaintext
+	d.plaintext = plaintext
 
 	if d.header.compression {
-		out, err := util.Unzip(&d.plaintext)
-		d.plaintext = *out
+		d.plaintext, err = util.Unzip(d.plaintext)
 		if err != nil {
 			return err
 		}
@@ -154,20 +153,20 @@ func (d *Database) Decrypt() error {
 	return nil
 }
 
-func (d *Database) checkStreamStartBytes(plaintext *[]byte) bool {
+func (d *Database) checkStreamStartBytesAndTrim(plaintext *[]byte) bool {
 	ok := bytes.Equal(d.header.streamStartBytes, (*plaintext)[:len(d.header.streamStartBytes)])
 	*plaintext = (*plaintext)[len(d.header.streamStartBytes):]
 	return ok
 }
 
-func parseBlocks(plainBlocks *[]byte) (*[]byte, error) {
+func parseBlocks(plainBlocks []byte) ([]byte, error) {
 	blocks := make(map[uint32]block)
 	hashIndex := 0
 	totalSize := 0
 	i := 0
-	for i < len(*plainBlocks) {
+	for i < len(plainBlocks) {
 		// Read block id
-		blockID := binary.LittleEndian.Uint32((*plainBlocks)[i : i+DWORD])
+		blockID := binary.LittleEndian.Uint32(plainBlocks[i : i+DWORD])
 		i += DWORD
 		if _, exists := blocks[blockID]; exists {
 			return nil, ParseError{fmt.Errorf("Duplicate block ID: %d", blockID)}
@@ -177,7 +176,7 @@ func parseBlocks(plainBlocks *[]byte) (*[]byte, error) {
 		i += SHA256_DIGEST_LEN
 
 		// Read block size
-		blockSize := int(binary.LittleEndian.Uint32((*plainBlocks)[i : i+DWORD]))
+		blockSize := int(binary.LittleEndian.Uint32(plainBlocks[i : i+DWORD]))
 		// Final block has block size 0
 		if blockSize == 0 {
 			break
@@ -185,8 +184,8 @@ func parseBlocks(plainBlocks *[]byte) (*[]byte, error) {
 		i += DWORD
 
 		// Hash and compare
-		hash := sha256.Sum256((*plainBlocks)[i : i+blockSize])
-		if !bytes.Equal(hash[:], (*plainBlocks)[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
+		hash := sha256.Sum256(plainBlocks[i : i+blockSize])
+		if !bytes.Equal(hash[:], plainBlocks[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
 			return nil, ParseError{errors.New("Block hash does not match. File may be corrupted")}
 		}
 		blocks[blockID] = block{start: i, length: blockSize}
@@ -205,37 +204,37 @@ func parseBlocks(plainBlocks *[]byte) (*[]byte, error) {
 	pos := 0
 	for _, id := range blockIDs {
 		block := blocks[uint32(id)]
-		copy(out[pos:pos+block.length], (*plainBlocks)[block.start:block.start+block.length])
+		copy(out[pos:pos+block.length], plainBlocks[block.start:block.start+block.length])
 		pos += block.length
 	}
 
-	return &out, nil
+	return out, nil
 }
 
 // formatBocks does the opposite of parseBlocks: It formats the given byte array as one block,
-// followed by a zero-block (length and hash are all zeros) which indicates the last block
-func formatBocks(in *[]byte) (*[]byte, error) {
+// followed by a zero-block which indicates the end of blocks
+func formatBocks(in []byte) ([]byte, error) {
 	zeroBuf := []byte{0x00, 0x00, 0x00, 0x00}
 	oneBuf := []byte{0x01, 0x00, 0x00, 0x00}
 
-	inputLength := uint32(len(*in))
+	inputLength := uint32(len(in))
 	totalLength := 4*DWORD + 2*SHA256_DIGEST_LEN + inputLength
-	hash := sha256.Sum256(*in)
+	hash := sha256.Sum256(in)
 	lengthBuf := make([]byte, DWORD)
 	binary.LittleEndian.PutUint32(lengthBuf, inputLength)
 
 	out := make([]byte, 0, totalLength)
-	// One block for the entire file content
+	// One block for all content
 	out = append(out, zeroBuf...)
 	out = append(out, hash[:]...)
 	out = append(out, lengthBuf[:]...)
-	out = append(out, *in...)
+	out = append(out, in...)
 	// Last block to signal end of file
 	out = append(out, oneBuf...)
 	out = append(out, make([]byte, SHA256_DIGEST_LEN)...)
 	out = append(out, zeroBuf...)
 
-	return &out, nil
+	return out, nil
 }
 
 func (d *Database) Parse() error {
@@ -252,14 +251,11 @@ func (d *Database) VerifyHeaderHash() (bool, error) {
 	if len(d.parsed.Meta.HeaderHash) == 0 {
 		return false, errors.New("No header hash found in XML")
 	}
-	// TODO: Use base64.StdEncoding.DecodeString for brevity
-	storedHashEnc := []byte(d.parsed.Meta.HeaderHash)
-	storedHash := make([]byte, base64.StdEncoding.DecodedLen(len(storedHashEnc)))
-	length, err := base64.StdEncoding.Decode(storedHash, storedHashEnc)
+	storedHash, err := base64.StdEncoding.DecodeString(d.parsed.Meta.HeaderHash)
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(d.header.hashOfRead[:], storedHash[:length]), nil
+	return bytes.Equal(d.header.hashOfRead[:], storedHash[:]), nil
 }
 
 func (d *Database) Save() error {
@@ -267,7 +263,6 @@ func (d *Database) Save() error {
 }
 
 func (d *Database) SaveToPath(path string) error {
-	// TODO: Store header hash
 	if d.parsed == nil {
 		return errors.New("Tried to save database to file but parsed is nil")
 	}
@@ -289,7 +284,7 @@ func (d *Database) SaveToPath(path string) error {
 	}
 
 	// Make plaintext blocks
-	plainBlocks, err := formatBocks(&xml)
+	plainBlocks, err := formatBocks(xml)
 	if err != nil {
 		return err
 	}
@@ -299,9 +294,9 @@ func (d *Database) SaveToPath(path string) error {
 		return err
 	}
 
-	plaintext := make([]byte, 0, len(header.streamStartBytes)+len(*plainBlocks))
+	plaintext := make([]byte, 0, len(header.streamStartBytes)+len(plainBlocks))
 	plaintext = append(plaintext, header.streamStartBytes...)
-	plaintext = append(plaintext, *plainBlocks...)
+	plaintext = append(plaintext, plainBlocks...)
 	ciphertext, err := crypto.EncryptAES(plaintext, masterKey, header.encryptionIV)
 	if err != nil {
 		return err
