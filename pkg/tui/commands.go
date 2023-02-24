@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Zaphoood/tresor/lib/keepass/crypto"
 	database "github.com/Zaphoood/tresor/lib/keepass/database"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -40,7 +41,9 @@ func decryptFileCmd(database *database.Database, password string) tea.Cmd {
 		database.SetPassword(password)
 		err := database.Decrypt()
 		if err != nil {
-			return decryptFailedMsg{err}
+			if _, ok := err.(crypto.DecryptError); ok {
+				return decryptFailedMsg{errors.New("Incorrect password")}
+			}
 		}
 		err = database.Parse()
 		if err != nil {

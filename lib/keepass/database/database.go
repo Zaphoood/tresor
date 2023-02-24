@@ -28,29 +28,9 @@ type block struct {
 	length int
 }
 
-type FileError struct {
-	err error
-}
+type FileError error
 
-func (e FileError) Error() string {
-	return e.err.Error()
-}
-
-type ParseError struct {
-	err error
-}
-
-func (e ParseError) Error() string {
-	return e.err.Error()
-}
-
-type DecryptError struct {
-	err error
-}
-
-func (e DecryptError) Error() string {
-	return e.err.Error()
-}
+type ParseError error
 
 type BlockSizeError struct {
 	expectedBlockSize int
@@ -110,11 +90,11 @@ func (d *Database) Load() error {
 
 	d.ciphertext, err = ioutil.ReadAll(f)
 	if err != nil {
-		return FileError{fmt.Errorf("Error while reading database content: %s", err)}
+		return FileError(fmt.Errorf("Error while reading database content: %s", err))
 	}
 
 	if len(d.ciphertext)%aes.BlockSize != 0 {
-		return FileError{BlockSizeError{aes.BlockSize}}
+		return FileError(BlockSizeError{aes.BlockSize})
 	}
 
 	return nil
@@ -131,8 +111,12 @@ func (d *Database) Decrypt() error {
 		return err
 	}
 
+	type foo struct {
+		bar int
+	}
+
 	if !d.checkStreamStartBytesAndTrim(&plaintext) {
-		return DecryptError{errors.New("Wrong password")}
+		return crypto.DecryptError(errors.New("Stream start bytes don't match"))
 	}
 
 	plaintext, err = parseBlocks(plaintext)
@@ -169,7 +153,7 @@ func parseBlocks(plainBlocks []byte) ([]byte, error) {
 		}
 		blockID := binary.LittleEndian.Uint32(buf)
 		if blockID != blockCounter {
-			return nil, ParseError{fmt.Errorf("Invalid block ID: %d", blockID)}
+			return nil, ParseError(fmt.Errorf("Invalid block ID: %d", blockID))
 		}
 		blockCounter++
 
@@ -196,7 +180,7 @@ func parseBlocks(plainBlocks []byte) ([]byte, error) {
 
 		hash := sha256.Sum256(content)
 		if !bytes.Equal(storedHash, hash[:]) {
-			return nil, ParseError{errors.New("Block hash does not match. File may be corrupted")}
+			return nil, ParseError(errors.New("Block hash does not match. File may be corrupted"))
 		}
 		out.Write(content)
 	}

@@ -9,6 +9,8 @@ import (
 	"github.com/andreburgaud/crypt2go/padding"
 )
 
+type DecryptError error
+
 func GenerateMasterKey(password string, masterSeed, transformSeed []byte, transformRounds uint64) ([]byte, error) {
 	// Generate composite key
 	compositeKey := sha256.Sum256([]byte(password))
@@ -57,7 +59,7 @@ func DecryptAES(ciphertext, key, iv []byte) ([]byte, error) {
 	padder := padding.NewPkcs7Padding(aes.BlockSize)
 	unpadded, err := padder.Unpad(plaintext)
 	if err != nil {
-		return nil, err
+		return nil, DecryptError(err)
 	} else {
 		return unpadded, nil
 	}
