@@ -15,7 +15,7 @@ import (
 
 /* Model for navigating the Database in order to view and edit entries */
 
-const CLEAR_CLIPBOARD_DELAY = 3
+const CLEAR_CLIPBOARD_DELAY = 10
 
 var itemViewColumns []table.Column = []table.Column{
 	{Title: "Name", Width: 0},
