@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -108,21 +109,15 @@ func TestErrors(t *testing.T) {
 	cases := []struct {
 		path       string
 		loadErr    error
-		decryptErr error
 	}{
-		{"../test/invalid_file_signature.kdbx", FileError{}, nil},
-		{"../test/invalid_version_signature.kdbx", FileError{}, nil},
-		{"../test/invalid_cipher_id.kdbx", FileError{}, nil},
-		{"../test/invalid_length.kdbx", FileError{}, nil},
+		{"../test/invalid_file_signature.kdbx", FileError(errors.New(""))},
+		{"../test/invalid_version_signature.kdbx", FileError(errors.New(""))},
+		{"../test/invalid_cipher_id.kdbx", FileError(errors.New(""))},
+		{"../test/invalid_length.kdbx", BlockSizeError{}},
 	}
 	for _, c := range cases {
 		d := New(c.path)
 		err := d.Load()
 		assert.IsType(t, c.loadErr, err, fmt.Sprintf("Expected '%T' when loading '%s'", c.loadErr, c.path))
-		if err == nil {
-			d.SetPassword("foo")
-			err = d.Decrypt()
-			assert.IsType(t, c.decryptErr, err, fmt.Sprintf("Expected '%T' when decrypting '%s', got '%s'", c.decryptErr, c.path, err.Error()))
-		}
 	}
 }

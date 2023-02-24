@@ -9,6 +9,8 @@ import (
 	"github.com/andreburgaud/crypt2go/padding"
 )
 
+type DecryptError error
+
 func GenerateMasterKey(password string, masterSeed, transformSeed []byte, transformRounds uint64) ([]byte, error) {
 	// Generate composite key
 	compositeKey := sha256.Sum256([]byte(password))

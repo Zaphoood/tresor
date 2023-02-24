@@ -189,7 +189,7 @@ func (h *header) read(stream *os.File) error {
 		return err
 	}
 	if !eq {
-		return FileError{errors.New("Invalid file signature")}
+		return FileError(errors.New("Invalid file signature"))
 	}
 
 	// Check KeePass version signature
@@ -198,7 +198,7 @@ func (h *header) read(stream *os.File) error {
 		return err
 	}
 	if !eq {
-		return FileError{errors.New("Invalid or unsupported version signature")}
+		return FileError(errors.New("Invalid or unsupported version signature"))
 	}
 
 	err = h.version.read(stream)
@@ -255,12 +255,12 @@ func (h *header) read(stream *os.File) error {
 	// Parse header fields
 	for _, h := range obligatoryFields {
 		if _, present := headerMap[h]; !present {
-			return FileError{fmt.Errorf("Missing header with code %d", h)}
+			return FileError(fmt.Errorf("Missing header with code %d", h))
 		}
 	}
 
 	if !bytes.Equal(headerMap[CipherID], AES_CIPHER_ID[:]) {
-		return FileError{errors.New("Invalid or unsupported cipher")}
+		return FileError(errors.New("Invalid or unsupported cipher"))
 	}
 
 	h.compression, err = getCompression(headerMap[CompressionFlag])
@@ -277,7 +277,7 @@ func (h *header) read(stream *os.File) error {
 
 	irsid := binary.LittleEndian.Uint32(headerMap[InnerRandomStreamID])
 	if !validIRSID(irsid) {
-		return FileError{fmt.Errorf("Invalid Inner Random Stream ID: %d", irsid)}
+		return FileError(fmt.Errorf("Invalid Inner Random Stream ID: %d", irsid))
 	}
 	h.irsid = IRSID(irsid)
 
@@ -358,7 +358,7 @@ func getCompression(compressionFlag []byte) (bool, error) {
 	case COMPRESSION_GZip:
 		return true, nil
 	default:
-		return false, FileError{fmt.Errorf("Unknown compression flag: %d", flag)}
+		return false, FileError(fmt.Errorf("Unknown compression flag: %d", flag))
 	}
 }
 
