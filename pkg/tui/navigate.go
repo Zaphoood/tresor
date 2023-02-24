@@ -2,7 +2,6 @@ package tui
 
 import (
 	"log"
-	"time"
 
 	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
@@ -35,9 +34,8 @@ type Navigate struct {
 	focusedItem  parser.Item
 	lastCursor   map[string]string
 
-	lastCopy time.Time
-	path     []string
-	err      error
+	path []string
+	err  error
 
 	styles       table.Styles
 	windowWidth  int
@@ -183,20 +181,12 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 		log.Printf("Failed to get Password for '%s'\n", focusedEntry.UUID)
 		return nil
 	}
-	clipboard.Write(clipboard.FmtText, []byte(unlocked.Inner))
+	notifyChange := clipboard.Write(clipboard.FmtText, []byte(unlocked.Inner))
 
-	timestamp := time.Now()
-	n.lastCopy = timestamp
-	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, timestamp)
+	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChange)
 }
 
-func (n *Navigate) clearClipboard(timestamp time.Time) {
-	if n.lastCopy == timestamp {
-		forceClearClipboard()
-	}
-}
-
-func forceClearClipboard() {
+func clearClipboard() {
 	clipboard.Write(clipboard.FmtText, []byte(""))
 }
 
@@ -207,7 +197,7 @@ func (n Navigate) Init() tea.Cmd {
 func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case clearClipboardMsg:
-		n.clearClipboard(msg.timestamp)
+		clearClipboard()
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
@@ -216,7 +206,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
-			forceClearClipboard()
+			clearClipboard()
 			return n, tea.Quit
 		case "enter":
 			cmd := n.copyToClipboard()
