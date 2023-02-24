@@ -192,8 +192,12 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 
 func (n *Navigate) clearClipboard(timestamp time.Time) {
 	if n.lastCopy == timestamp {
-		clipboard.Write(clipboard.FmtText, []byte(""))
+		forceClearClipboard()
 	}
+}
+
+func forceClearClipboard() {
+	clipboard.Write(clipboard.FmtText, []byte(""))
 }
 
 func (n Navigate) Init() tea.Cmd {
@@ -212,6 +216,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
+			forceClearClipboard()
 			return n, tea.Quit
 		case "enter":
 			cmd := n.copyToClipboard()
