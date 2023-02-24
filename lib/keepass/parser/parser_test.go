@@ -43,6 +43,13 @@ func TestParse(t *testing.T) {
 		assert.Equal("Password", password.Inner)
 	}
 
+	_, err = firstEntry.Get("foo")
+	assert.NotNil(err)
+
+	fallback := "bar"
+	result := firstEntry.TryGet("foo", fallback)
+	assert.Equal(fallback, result)
+
 	assert.Equal(2, len(firstEntry.BinaryRefs))
 	for _, bref := range firstEntry.BinaryRefs {
 		if bref.Reference.ID == 0 {
@@ -95,4 +102,11 @@ func TestParse(t *testing.T) {
 	path, found = parsed.FindPath(uuid1)
 	assert.True(found)
 	assert.Equal(uuid1, path[len(path)-1])
+
+	path = []string{"M0Gbdz4OmEaVH1j8pqgWFA==", "TLnGe1+SlES04aiZ9Sk0Kg==", "NZY6u4bWoUqJaIvckl3mLA=="}
+	item, err := parsed.GetItem(path)
+	entry, ok := item.(Entry)
+	if assert.True(ok) {
+		assert.Equal(entry.UUID, path[len(path)-1])
+	}
 }
