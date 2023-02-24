@@ -135,7 +135,7 @@ type header struct {
 	streamStartBytes     []byte
 	irsid                IRSID
 	// Hash of the raw data that was read from disk during call to `header.read()`
-	hashOfRead [SHA256_DIGEST_LEN]byte
+	hashOfRead [sha256.Size]byte
 }
 
 func (h *header) Copy() *header {
@@ -285,19 +285,19 @@ func (h *header) read(stream *os.File) error {
 }
 
 // Write header to stream and return hash of bytes that were written
-func (h *header) write(stream io.Writer) ([SHA256_DIGEST_LEN]byte, error) {
+func (h *header) write(stream io.Writer) ([sha256.Size]byte, error) {
 	buf := new(bytes.Buffer)
 	err := util.WriteAssert(buf, FILE_SIGNATURE[:])
 	if err != nil {
-		return [SHA256_DIGEST_LEN]byte{}, err
+		return [sha256.Size]byte{}, err
 	}
 	err = util.WriteAssert(buf, VERSION_SIGNATURE[:])
 	if err != nil {
-		return [SHA256_DIGEST_LEN]byte{}, err
+		return [sha256.Size]byte{}, err
 	}
 	h.version.write(buf)
 	if err != nil {
-		return [SHA256_DIGEST_LEN]byte{}, err
+		return [sha256.Size]byte{}, err
 	}
 
 	compressionFlag := getCompressionFlag(h.compression)
@@ -325,7 +325,7 @@ func (h *header) write(stream io.Writer) ([SHA256_DIGEST_LEN]byte, error) {
 	for _, field := range fields {
 		err := writeHeaderField(buf, field.id, field.data)
 		if err != nil {
-			return [SHA256_DIGEST_LEN]byte{}, err
+			return [sha256.Size]byte{}, err
 		}
 	}
 	raw, _ := io.ReadAll(buf)

@@ -19,11 +19,9 @@ import (
 
 // TODO: Consider moving constants to a separate file
 const (
-	// TODO: Replace with `sha256.Size`
-	SHA256_DIGEST_LEN = 32
-	WORD              = 2
-	DWORD             = 4
-	QWORD             = 8
+	WORD  = 2
+	DWORD = 4
+	QWORD = 8
 )
 
 type block struct {
@@ -176,7 +174,7 @@ func parseBlocks(plainBlocks []byte) ([]byte, error) {
 		}
 		blockCounter++
 
-		storedHash := make([]byte, SHA256_DIGEST_LEN)
+		storedHash := make([]byte, sha256.Size)
 		util.ReadAssert(in, storedHash)
 
 		buf = make([]byte, DWORD)
