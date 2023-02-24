@@ -128,7 +128,7 @@ type Entry struct {
 	BinaryRefs      []BinaryReference `xml:"Binary"`
 	AutoType        AutoType
 	// History must be pointer to slice in order for omitempty to work for nested elements
-	History         *[]Entry `xml:"History>Entry,omitempty"`
+	History *[]Entry `xml:"History>Entry,omitempty"`
 }
 
 type Times struct {

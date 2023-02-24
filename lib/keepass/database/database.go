@@ -217,6 +217,7 @@ func formatBocks(in []byte) ([]byte, error) {
 	zeroBuf := []byte{0x00, 0x00, 0x00, 0x00}
 	oneBuf := []byte{0x01, 0x00, 0x00, 0x00}
 
+	// TODO: Split input into multiple blocks if necessary
 	inputLength := uint32(len(in))
 	totalLength := 4*DWORD + 2*SHA256_DIGEST_LEN + inputLength
 	hash := sha256.Sum256(in)
@@ -264,7 +265,7 @@ func (d *Database) Save() error {
 
 func (d *Database) SaveToPath(path string) error {
 	if d.parsed == nil {
-		return errors.New("Tried to save database to file but parsed is nil")
+		return errors.New("parsed must not be nil")
 	}
 	header := d.header.Copy()
 	header.randomize()
@@ -310,7 +311,7 @@ func (d *Database) SaveToPath(path string) error {
 	if err != nil {
 		return err
 	}
+	err = util.WriteAssert(f, ciphertext)
 
-	_, err = f.Write(ciphertext)
 	return err
 }

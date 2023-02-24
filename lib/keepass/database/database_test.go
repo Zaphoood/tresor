@@ -65,20 +65,43 @@ func TestLoadDb(t *testing.T) {
 func TestLoadSave(t *testing.T) {
 	assert := assert.New(t)
 
-	path := "../test/example.kdbx"
-	d := New(path)
-	if !assert.Nil(d.Load()) {
-		return
+	files := []struct {
+		path     string
+		password string
+	}{
+		{"../test/example_compressed.kdbx", "foo"},
+		{"../test/example.kdbx", "foo"},
 	}
+	for _, file := range files {
+		path_out := "../test/saved.kdbx"
 
-	d.SetPassword("foo")
-	if !assert.Nil(d.Decrypt()) {
-		return
+		d := New(file.path)
+		if !assert.Nil(d.Load()) {
+			return
+		}
+
+		d.SetPassword(file.password)
+		if !assert.Nil(d.Decrypt()) {
+			return
+		}
+		if !assert.Nil(d.Parse()) {
+			return
+		}
+		assert.Nil(d.SaveToPath(path_out))
+
+		d2 := New(path_out)
+		if !assert.Nil(d2.Load()) {
+			return
+		}
+
+		d2.SetPassword(file.password)
+		if !assert.Nil(d2.Decrypt()) {
+			return
+		}
+		if !assert.Nil(d2.Parse()) {
+			return
+		}
 	}
-	if !assert.Nil(d.Parse()) {
-		return
-	}
-	assert.Nil(d.SaveToPath("../../../saved.kdbx"))
 }
 
 func TestErrors(t *testing.T) {
