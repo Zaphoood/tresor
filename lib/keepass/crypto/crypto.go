@@ -59,7 +59,7 @@ func DecryptAES(ciphertext, key, iv []byte) ([]byte, error) {
 	padder := padding.NewPkcs7Padding(aes.BlockSize)
 	unpadded, err := padder.Unpad(plaintext)
 	if err != nil {
-		return nil, err
+		return nil, DecryptError(err)
 	} else {
 		return unpadded, nil
 	}

@@ -107,8 +107,8 @@ func TestLoadSave(t *testing.T) {
 
 func TestErrors(t *testing.T) {
 	cases := []struct {
-		path       string
-		loadErr    error
+		path    string
+		loadErr error
 	}{
 		{"../test/invalid_file_signature.kdbx", FileError(errors.New(""))},
 		{"../test/invalid_version_signature.kdbx", FileError(errors.New(""))},

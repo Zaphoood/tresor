@@ -116,7 +116,7 @@ func (d *Database) Decrypt() error {
 	}
 
 	if !d.checkStreamStartBytesAndTrim(&plaintext) {
-		return crypto.DecryptError(errors.New("Wrong password"))
+		return crypto.DecryptError(errors.New("Stream start bytes don't match"))
 	}
 
 	plaintext, err = parseBlocks(plaintext)
