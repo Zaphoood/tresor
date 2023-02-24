@@ -8,10 +8,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"math"
 	"os"
-	"sort"
 
 	"github.com/Zaphoood/tresor/lib/keepass/crypto"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
@@ -19,43 +18,14 @@ import (
 )
 
 const (
-	SHA256_DIGEST_LEN = 32
-	WORD              = 2
-	DWORD             = 4
+	WORD  = 2
+	DWORD = 4
+	QWORD = 8
 )
 
 type block struct {
 	start  int
 	length int
-}
-
-type version struct {
-	major uint16
-	minor uint16
-}
-
-func (v *version) read(r io.Reader) error {
-	buf := make([]byte, WORD)
-
-	read, err := r.Read(buf)
-	if err != nil {
-		return err
-	}
-	if read != len(buf) {
-		return errors.New("File truncated")
-	}
-	v.minor = binary.LittleEndian.Uint16(buf)
-
-	read, err = r.Read(buf)
-	if err != nil {
-		return err
-	}
-	if read != len(buf) {
-		return errors.New("File truncated")
-	}
-	v.major = binary.LittleEndian.Uint16(buf)
-
-	return nil
 }
 
 type FileError struct {
@@ -91,10 +61,9 @@ func (e BlockSizeError) Error() string {
 }
 
 type Database struct {
-	path       string
-	version    version
-	header     header
-	headerHash [SHA256_DIGEST_LEN]byte
+	path     string
+	password string
+	header   header
 
 	ciphertext []byte
 	plaintext  []byte
@@ -111,6 +80,10 @@ func (d Database) Path() string {
 	return d.path
 }
 
+func (d *Database) SetPassword(password string) {
+	d.password = password
+}
+
 func (d Database) Plaintext() []byte {
 	return d.plaintext
 }
@@ -120,7 +93,7 @@ func (d Database) Parsed() *parser.Document {
 }
 
 func (d Database) Version() version {
-	return d.version
+	return d.header.version
 }
 
 func (d *Database) Load() error {
@@ -130,45 +103,10 @@ func (d *Database) Load() error {
 		return err
 	}
 
-	// Check filetype signature
-	eq, err := util.ReadCompare(f, FILE_SIGNATURE[:])
-	if err != nil {
-		return err
-	}
-	if !eq {
-		return FileError{errors.New("Invalid file signature")}
-	}
-
-	// Check KeePass version signature
-	eq, err = util.ReadCompare(f, VERSION_SIGNATURE[:])
-	if err != nil {
-		return err
-	}
-	if !eq {
-		return FileError{errors.New("Invalid or unsupported version signature")}
-	}
-
-	err = d.version.read(f)
-	if err != nil {
-		return err
-	}
-
 	err = d.header.read(f)
 	if err != nil {
 		return err
 	}
-
-	headerLength, err := f.Seek(0, 1)
-	if err != nil {
-		return err
-	}
-	headerRaw := make([]byte, headerLength)
-	_, err = f.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-	f.Read(headerRaw)
-	d.headerHash = sha256.Sum256(headerRaw)
 
 	d.ciphertext, err = ioutil.ReadAll(f)
 	if err != nil {
@@ -182,8 +120,8 @@ func (d *Database) Load() error {
 	return nil
 }
 
-func (d *Database) Decrypt(password string) error {
-	masterKey, err := d.generateMasterKey(password)
+func (d *Database) Decrypt() error {
+	masterKey, err := crypto.GenerateMasterKey(d.password, d.header.masterSeed, d.header.transformSeed, d.header.transformRounds)
 	if err != nil {
 		return err
 	}
@@ -193,18 +131,18 @@ func (d *Database) Decrypt(password string) error {
 		return err
 	}
 
-	if !d.checkStreamStartBytes(&plaintext) {
+	if !d.checkStreamStartBytesAndTrim(&plaintext) {
 		return DecryptError{errors.New("Wrong password")}
 	}
 
-	err = d.parseBlocks(&plaintext)
+	plaintext, err = parseBlocks(plaintext)
 	if err != nil {
 		return err
 	}
+	d.plaintext = plaintext
 
-	if d.header.gzipCompression {
-		out, err := util.Unzip(&d.plaintext)
-		d.plaintext = *out
+	if d.header.compression {
+		d.plaintext, err = util.GUnzip(d.plaintext)
 		if err != nil {
 			return err
 		}
@@ -213,85 +151,101 @@ func (d *Database) Decrypt(password string) error {
 	return nil
 }
 
-func (d *Database) generateMasterKey(password string) ([]byte, error) {
-	// Generate composite key
-	compositeKey := sha256.Sum256([]byte(password))
-	compositeKey = sha256.Sum256(compositeKey[:])
-
-	// Generate master key
-	transformOut, err := crypto.AESRounds(compositeKey[:], d.header.transformSeed, d.header.transformRounds)
-	if err != nil {
-		return nil, err
-	}
-	transformKey := sha256.Sum256(transformOut)
-
-	h := sha256.New()
-	h.Write(d.header.masterSeed)
-	h.Write(transformKey[:])
-	return h.Sum(nil), nil
-}
-
-func (d *Database) checkStreamStartBytes(plaintext *[]byte) bool {
+func (d *Database) checkStreamStartBytesAndTrim(plaintext *[]byte) bool {
 	ok := bytes.Equal(d.header.streamStartBytes, (*plaintext)[:len(d.header.streamStartBytes)])
 	*plaintext = (*plaintext)[len(d.header.streamStartBytes):]
 	return ok
 }
 
-func (d *Database) parseBlocks(plaintextBlocks *[]byte) error {
-	blocks := make(map[uint32]block)
-	hashIndex := 0
-	totalSize := 0
-	i := 0
-	for i < len((*plaintextBlocks)) {
-		// Read block id
-		blockID := binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD])
-		i += DWORD
-		if _, exists := blocks[blockID]; exists {
-			return ParseError{fmt.Errorf("Duplicate block ID: %d", blockID)}
+func parseBlocks(plainBlocks []byte) ([]byte, error) {
+	in := bytes.NewReader(plainBlocks)
+	var out bytes.Buffer
+	blockCounter := uint32(0)
+	for {
+		buf := make([]byte, DWORD)
+		err := util.ReadAssert(in, buf)
+		if err != nil {
+			return nil, err
 		}
-		// Store index of hash for later comparison
-		hashIndex = i
-		i += SHA256_DIGEST_LEN
+		blockID := binary.LittleEndian.Uint32(buf)
+		if blockID != blockCounter {
+			return nil, ParseError{fmt.Errorf("Invalid block ID: %d", blockID)}
+		}
+		blockCounter++
 
-		// Read block size
-		blockSize := int(binary.LittleEndian.Uint32((*plaintextBlocks)[i : i+DWORD]))
-		// Final block has block size 0
+		storedHash := make([]byte, sha256.Size)
+		util.ReadAssert(in, storedHash)
+
+		buf = make([]byte, DWORD)
+		err = util.ReadAssert(in, buf)
+		if err != nil {
+			return nil, err
+		}
+		blockSize := int(binary.LittleEndian.Uint32(buf))
 		if blockSize == 0 {
+			for _, b := range storedHash {
+				if b != 0 {
+					return nil, errors.New("Hash of final block must be zero")
+				}
+			}
 			break
 		}
-		i += DWORD
 
-		// Hash and compare
-		hash := sha256.Sum256((*plaintextBlocks)[i : i+blockSize])
-		if !bytes.Equal(hash[:], (*plaintextBlocks)[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
-			return ParseError{errors.New("Block hash does not match. File may be corrupted")}
+		content := make([]byte, blockSize)
+		util.ReadAssert(in, content)
+
+		hash := sha256.Sum256(content)
+		if !bytes.Equal(storedHash, hash[:]) {
+			return nil, ParseError{errors.New("Block hash does not match. File may be corrupted")}
 		}
-		blocks[blockID] = block{start: i, length: blockSize}
-		totalSize += blockSize
-		i += blockSize
+		out.Write(content)
 	}
 
-	// Concatenate blocks by order of their IDs
-	blockIDs := []int{}
-	for id := range blocks {
-		blockIDs = append(blockIDs, int(id))
-	}
-	sort.Ints(blockIDs)
+	return out.Bytes(), nil
+}
 
-	d.plaintext = make([]byte, totalSize)
-	pos := 0
-	for _, id := range blockIDs {
-		block := blocks[uint32(id)]
-		copy(d.plaintext[pos:pos+block.length], (*plaintextBlocks)[block.start:block.start+block.length])
-		pos += block.length
+// formatBlocks formats the given byte array into blocks as per the kdbx file standard
+func formatBlocks(in []byte) ([]byte, error) {
+	var outBuf bytes.Buffer
+
+	index := 0
+	blockID := 0
+	for {
+		blockLength := len(in) - index
+		if blockLength > math.MaxInt32 {
+			blockLength = math.MaxInt32
+		}
+		block := in[index : index+blockLength]
+		var hash [32]byte
+		if index < len(in) {
+			hash = sha256.Sum256(block)
+		} else {
+			// Last block's hash is all zeros, no need to do anything
+		}
+		blockIDBuf := make([]byte, DWORD)
+		binary.LittleEndian.PutUint32(blockIDBuf, uint32(blockID))
+		lengthBuf := make([]byte, DWORD)
+		binary.LittleEndian.PutUint32(lengthBuf, uint32(blockLength))
+
+		outBuf.Write(blockIDBuf)
+		outBuf.Write(hash[:])
+		outBuf.Write(lengthBuf[:])
+		outBuf.Write(block)
+
+		if index >= len(in) {
+			break
+		}
+
+		index += blockLength
+		blockID++
 	}
 
-	return nil
+	return outBuf.Bytes(), nil
 }
 
 func (d *Database) Parse() error {
 	var err error
-	d.parsed, err = parser.Parse(d.plaintext, d.header.protectedStreamKey)
+	d.parsed, err = parser.Parse(d.plaintext, sha256.Sum256(d.header.innerRandomStreamKey))
 	if err != nil {
 		return err
 	}
@@ -303,11 +257,66 @@ func (d *Database) VerifyHeaderHash() (bool, error) {
 	if len(d.parsed.Meta.HeaderHash) == 0 {
 		return false, errors.New("No header hash found in XML")
 	}
-	storedHashEnc := []byte(d.parsed.Meta.HeaderHash)
-	storedHash := make([]byte, base64.StdEncoding.DecodedLen(len(storedHashEnc)))
-	length, err := base64.StdEncoding.Decode(storedHash, storedHashEnc)
+	storedHash, err := base64.StdEncoding.DecodeString(d.parsed.Meta.HeaderHash)
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(d.headerHash[:], storedHash[:length]), nil
+	return bytes.Equal(d.header.hashOfRead[:], storedHash[:]), nil
+}
+
+func (d *Database) Save() error {
+	return d.SaveToPath(d.path)
+}
+
+func (d *Database) SaveToPath(path string) error {
+	if d.parsed == nil {
+		return errors.New("parsed must not be nil")
+	}
+	header := d.header.Copy()
+	header.randomize()
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	hash, err := header.write(f)
+	if err != nil {
+		return err
+	}
+
+	d.parsed.Meta.HeaderHash = base64.StdEncoding.EncodeToString(hash[:])
+
+	xml, err := parser.Unparse(d.parsed, sha256.Sum256(header.innerRandomStreamKey))
+	if err != nil {
+		return err
+	}
+
+	if header.compression {
+		xml, err = util.GZip(xml)
+		if err != nil {
+			return err
+		}
+	}
+
+	plainBlocks, err := formatBlocks(xml)
+	if err != nil {
+		return err
+	}
+
+	masterKey, err := crypto.GenerateMasterKey(d.password, header.masterSeed, header.transformSeed, d.header.transformRounds)
+	if err != nil {
+		return err
+	}
+
+	plaintext := make([]byte, 0, len(header.streamStartBytes)+len(plainBlocks))
+	plaintext = append(plaintext, header.streamStartBytes...)
+	plaintext = append(plaintext, plainBlocks...)
+	ciphertext, err := crypto.EncryptAES(plaintext, masterKey, header.encryptionIV)
+	if err != nil {
+		return err
+	}
+	err = util.WriteAssert(f, ciphertext)
+
+	return err
 }

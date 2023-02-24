@@ -174,16 +174,16 @@ func (n Navigate) focusedUUID() string {
 }
 
 func (n *Navigate) copyToClipboard() tea.Cmd {
-	focused := n.focusedUUID()
-	if len(focused) == 0 {
+	focusedEntry, ok := n.focusedItem.(parser.Entry)
+	if !ok {
 		return nil
 	}
-	unlocked, err := n.database.Parsed().GetUnlocked(focused, "Password")
+	unlocked, err := focusedEntry.Get("Password")
 	if err != nil {
-		log.Printf("Failed to get Password for '%s'\n", focused)
+		log.Printf("Failed to get Password for '%s'\n", focusedEntry.UUID)
 		return nil
 	}
-	clipboard.Write(clipboard.FmtText, []byte(unlocked))
+	clipboard.Write(clipboard.FmtText, []byte(unlocked.Inner))
 
 	timestamp := time.Now()
 	n.lastCopy = timestamp

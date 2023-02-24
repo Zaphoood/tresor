@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -10,15 +9,12 @@ import (
 
 	"github.com/Zaphoood/tresor/lib/keepass/crypto"
 	"github.com/Zaphoood/tresor/lib/keepass/parser/wrappers"
-	"github.com/antchfx/xmlquery"
 )
 
 type Document struct {
 	XMLName xml.Name `xml:"KeePassFile"`
 	Meta    Meta
 	Root    Root
-	// Values with inner stream encryption are stored here after decrypting
-	Unlocked map[string]Entry `xml:"-"`
 }
 
 func NewDocument() *Document {
@@ -88,11 +84,10 @@ type Item interface{}
 
 type Group struct {
 	XMLName xml.Name `xml:"Group"`
-	Groups  []Group  `xml:"Group"`
-	Entries []Entry  `xml:"Entry"`
 
 	UUID                    string
 	Name                    string
+	Notes                   string
 	IconID                  int
 	Times                   Times
 	IsExpanded              wrappers.Bool
@@ -100,6 +95,9 @@ type Group struct {
 	EnableAutoType          wrappers.Bool
 	EnableSearching         wrappers.Bool
 	LastTopVisibleEntry     string
+
+	Entries []Entry `xml:"Entry"`
+	Groups  []Group `xml:"Group"`
 }
 
 func (g *Group) Get(uuid string) (Item, error) {
@@ -129,7 +127,8 @@ type Entry struct {
 	Strings         []String          `xml:"String"`
 	BinaryRefs      []BinaryReference `xml:"Binary"`
 	AutoType        AutoType
-	History         []Entry `xml:"History>Entry"`
+	// History must be pointer to slice in order for omitempty to work for nested elements
+	History *[]Entry `xml:"History>Entry,omitempty"`
 }
 
 type Times struct {
@@ -154,7 +153,7 @@ type BinaryReferenceValue struct {
 type AutoType struct {
 	Enabled                 wrappers.Bool
 	DataTransferObfuscation int
-	Association             Association
+	Association             *Association `xml:",omitempty"`
 }
 
 type Association struct {
@@ -162,43 +161,35 @@ type Association struct {
 	KeystrokeSequence string
 }
 
-func (e *Entry) Get(key string) (Value, error) {
+func (e *Entry) Get(key string) (wrappers.Value, error) {
 	for _, field := range e.Strings {
 		if field.Key == key {
 			return field.Value, nil
 		}
 	}
-	return Value{}, fmt.Errorf("No such key: %s", key)
+	return wrappers.Value{}, fmt.Errorf("No such key: %s", key)
 }
 
-func (e *Entry) TryGet(key, fallback string) Value {
+// TryGet returns the value for the given key if it exists, fallback otherwise
+func (e *Entry) TryGet(key, fallback string) string {
 	result, err := e.Get(key)
 	if err != nil {
-		return Value{Chardata: fallback}
+		return fallback
 	}
-	return result
+	return result.Inner
 }
 
 type String struct {
 	XMLName xml.Name `xml:"String"`
 	Key     string
-	Value   Value
+	Value   wrappers.Value
 }
 
-type Value struct {
-	XMLName   xml.Name `xml:"Value"`
-	Chardata  string   `xml:",chardata"`
-	Protected string   `xml:"Protected,attr"`
-}
-
-func (v *Value) IsProtected() bool {
-	return v.Protected == "True"
-}
-
-func Parse(b []byte, key [32]byte) (*Document, error) {
+func Parse(b []byte, innerRandomStreamKey [32]byte) (*Document, error) {
 	p := NewDocument()
-	p.Unlock(b, key)
 
+	salsa := crypto.NewSalsa20Stream(innerRandomStreamKey)
+	wrappers.SetInnerRandomStream(salsa)
 	err := xml.Unmarshal(b, &p)
 	if err != nil {
 		return nil, err
@@ -206,91 +197,28 @@ func Parse(b []byte, key [32]byte) (*Document, error) {
 	return p, nil
 }
 
+func Unparse(d *Document, key [32]byte) ([]byte, error) {
+	salsa := crypto.NewSalsa20Stream(key)
+	wrappers.SetInnerRandomStream(salsa)
+
+	out, err := xml.MarshalIndent(d, "", "\t")
+	if err != nil {
+		return nil, err
+	}
+	unparsed := make([]byte, 0, len(xml.Header)+1+len(out))
+	unparsed = append(unparsed, xml.Header...)
+	unparsed = append(unparsed, byte('\n'))
+	unparsed = append(unparsed, out...)
+
+	return out, nil
+}
+
 type field struct {
 	key   string
 	value string
 }
 
-// Unlock scans the XML for protected Values and stores their decrypted values in d.Unlocked
-func (d *Document) Unlock(b []byte, key [32]byte) error {
-	unlocked := make(map[string]Entry)
-	salsa := crypto.NewSalsa20Stream(key)
-
-	doc, err := xmlquery.Parse(bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-
-	for _, entryElement := range xmlquery.Find(doc, `//Group/Entry`) {
-		currentEntry, err := unlockEntry(entryElement, salsa)
-		if err != nil {
-			return err
-		}
-		if history := xmlquery.FindOne(entryElement, "/History"); history != nil {
-			for _, entryElementH := range xmlquery.Find(history, `/Entry`) {
-				currentEntryH, err := unlockEntry(entryElementH, salsa)
-				if err != nil {
-					return err
-				}
-				currentEntry.History = append(currentEntry.History, currentEntryH)
-			}
-		}
-		unlocked[currentEntry.UUID] = currentEntry
-	}
-	d.Unlocked = unlocked
-
-	return nil
-}
-
-func unlockEntry(entryElement *xmlquery.Node, salsa *crypto.Salsa20Stream) (Entry, error) {
-	entry := Entry{}
-	uuidElement := xmlquery.FindOne(entryElement, "//UUID")
-	if uuidElement == nil {
-		return Entry{}, fmt.Errorf("<Entry> element without a <UUID> element:\n%s\n", entryElement.OutputXML(true))
-	}
-	entry.UUID = uuidElement.InnerText()
-
-	protectedValues, err := listProtected(entryElement)
-	if err != nil {
-		return Entry{}, err
-	}
-	for _, protected := range protectedValues {
-		decoded, err := base64.StdEncoding.DecodeString(protected.value)
-		if err != nil {
-			return Entry{}, err
-		}
-		decrypted := salsa.Decrypt(decoded)
-		entry.Strings = append(entry.Strings, String{Key: protected.key, Value: Value{Chardata: string(decrypted)}})
-	}
-	return entry, nil
-}
-
-// listProtected returns all <Value> nodes with the Protected attribute set to 'True' as a list of fields
-func listProtected(node *xmlquery.Node) ([]field, error) {
-	fields := make([]field, 0)
-	for _, protected := range xmlquery.Find(node, "/String/Value[@Protected='True']") {
-		if keyNode := xmlquery.FindOne(protected.Parent, "//Key"); keyNode != nil {
-			fields = append(fields, field{key: keyNode.InnerText(), value: protected.InnerText()})
-		} else {
-			return nil, fmt.Errorf("String element without a <Key> element:\n%s\n", protected.OutputXML(true))
-		}
-	}
-	return fields, nil
-}
-
-func (d *Document) GetUnlocked(uuid, key string) (string, error) {
-	if entry, exists := d.Unlocked[uuid]; exists {
-		value, err := entry.Get(key)
-		if err == nil {
-			return value.Chardata, nil
-		}
-		return "", err
-	} else {
-		return "", fmt.Errorf("No entry with UUID '%s' found in Unlocked", uuid)
-	}
-}
-
-// ListPath returns a group or an item specified by a path of UUIDs. The document is traversed,
+// GetItem returns a group or an item specified by a path of UUIDs. The document is traversed,
 // at each level choosing the group with UUID at the current index, until the end of the path is reached.
 // The last UUID may be that of an item.
 // For an empty path the function will return the top-level groups (which is just one group for most KeePass files)

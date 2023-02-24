@@ -3,6 +3,7 @@ module github.com/Zaphoood/tresor
 go 1.18
 
 require (
+	github.com/andreburgaud/crypt2go v1.1.0
 	github.com/antchfx/xmlquery v1.3.15
 	github.com/charmbracelet/bubbles v0.15.0
 	github.com/charmbracelet/bubbletea v0.23.1

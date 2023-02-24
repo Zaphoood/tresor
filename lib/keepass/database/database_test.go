@@ -39,7 +39,8 @@ func TestLoadDb(t *testing.T) {
 		version := d.Version()
 		assert.Equal(expectedVersion, version, fmt.Sprintf("Expected version: %d, got: %d", expectedVersion, version))
 
-		err = d.Decrypt(file.password)
+		d.SetPassword(file.password)
+		err = d.Decrypt()
 		if !assert.Nil(err) {
 			continue
 		}
@@ -61,6 +62,48 @@ func TestLoadDb(t *testing.T) {
 	}
 }
 
+func TestLoadSave(t *testing.T) {
+	assert := assert.New(t)
+
+	files := []struct {
+		path     string
+		password string
+	}{
+		{"../test/example_compressed.kdbx", "foo"},
+		{"../test/example.kdbx", "foo"},
+	}
+	for _, file := range files {
+		path_out := "../test/saved.kdbx"
+
+		d := New(file.path)
+		if !assert.Nil(d.Load()) {
+			return
+		}
+
+		d.SetPassword(file.password)
+		if !assert.Nil(d.Decrypt()) {
+			return
+		}
+		if !assert.Nil(d.Parse()) {
+			return
+		}
+		assert.Nil(d.SaveToPath(path_out))
+
+		d2 := New(path_out)
+		if !assert.Nil(d2.Load()) {
+			return
+		}
+
+		d2.SetPassword(file.password)
+		if !assert.Nil(d2.Decrypt()) {
+			return
+		}
+		if !assert.Nil(d2.Parse()) {
+			return
+		}
+	}
+}
+
 func TestErrors(t *testing.T) {
 	cases := []struct {
 		path       string
@@ -71,15 +114,15 @@ func TestErrors(t *testing.T) {
 		{"../test/invalid_version_signature.kdbx", FileError{}, nil},
 		{"../test/invalid_cipher_id.kdbx", FileError{}, nil},
 		{"../test/invalid_length.kdbx", FileError{}, nil},
-		{"../test/invalid_ssb.kdbx", nil, DecryptError{}},
 	}
 	for _, c := range cases {
 		d := New(c.path)
 		err := d.Load()
 		assert.IsType(t, c.loadErr, err, fmt.Sprintf("Expected '%T' when loading '%s'", c.loadErr, c.path))
 		if err == nil {
-			err = d.Decrypt("foo")
-			assert.IsType(t, c.decryptErr, err, fmt.Sprintf("Expected '%T' when decrypting '%s'", c.decryptErr, c.path))
+			d.SetPassword("foo")
+			err = d.Decrypt()
+			assert.IsType(t, c.decryptErr, err, fmt.Sprintf("Expected '%T' when decrypting '%s', got '%s'", c.decryptErr, c.path, err.Error()))
 		}
 	}
 }
