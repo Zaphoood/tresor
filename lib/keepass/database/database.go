@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"sort"
 
@@ -211,31 +212,43 @@ func parseBlocks(plainBlocks []byte) ([]byte, error) {
 	return out, nil
 }
 
-// formatBocks does the opposite of parseBlocks: It formats the given byte array as one block,
-// followed by a zero-block which indicates the end of blocks
-func formatBocks(in []byte) ([]byte, error) {
-	zeroBuf := []byte{0x00, 0x00, 0x00, 0x00}
-	oneBuf := []byte{0x01, 0x00, 0x00, 0x00}
+// formatBlocks formats the given byte array into blocks as per the kdbx file standard
+func formatBlocks(in []byte) ([]byte, error) {
+	var outBuf bytes.Buffer
 
-	// TODO: Split input into multiple blocks if necessary
-	inputLength := uint32(len(in))
-	totalLength := 4*DWORD + 2*SHA256_DIGEST_LEN + inputLength
-	hash := sha256.Sum256(in)
-	lengthBuf := make([]byte, DWORD)
-	binary.LittleEndian.PutUint32(lengthBuf, inputLength)
+	index := 0
+	blockID := 0
+	for {
+		blockLength := len(in) - index
+		if blockLength > math.MaxInt32 {
+			blockLength = math.MaxInt32
+		}
+		block := in[index : index+blockLength]
+		var hash [32]byte
+		if index < len(in) {
+			hash = sha256.Sum256(block)
+		} else {
+			// Last block's hash is all zeros, no need to do anything
+		}
+		blockIDBuf := make([]byte, DWORD)
+		binary.LittleEndian.PutUint32(blockIDBuf, uint32(blockID))
+		lengthBuf := make([]byte, DWORD)
+		binary.LittleEndian.PutUint32(lengthBuf, uint32(blockLength))
 
-	out := make([]byte, 0, totalLength)
-	// One block for all content
-	out = append(out, zeroBuf...)
-	out = append(out, hash[:]...)
-	out = append(out, lengthBuf[:]...)
-	out = append(out, in...)
-	// Last block to signal end of file
-	out = append(out, oneBuf...)
-	out = append(out, make([]byte, SHA256_DIGEST_LEN)...)
-	out = append(out, zeroBuf...)
+		outBuf.Write(blockIDBuf)
+		outBuf.Write(hash[:])
+		outBuf.Write(lengthBuf[:])
+		outBuf.Write(block)
 
-	return out, nil
+		if index >= len(in) {
+			break
+		}
+
+		index += blockLength
+		blockID++
+	}
+
+	return outBuf.Bytes(), nil
 }
 
 func (d *Database) Parse() error {
@@ -294,7 +307,7 @@ func (d *Database) SaveToPath(path string) error {
 		}
 	}
 
-	plainBlocks, err := formatBocks(xml)
+	plainBlocks, err := formatBlocks(xml)
 	if err != nil {
 		return err
 	}
