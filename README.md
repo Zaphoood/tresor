@@ -48,7 +48,7 @@ Some features planned for the future are:
 
 The main goal is to implement all the core features provided by [KeePass](https://www.google.com/search?channel=fs&client=ubuntu&q=keepass).
 
-Note that currently, only Linux is actively supported, but the code should compile on Windows as well. Try it out &mdash; it might just work ;)
+Note that currently, only Linux is actively supported, but the code should compile on Windows and macOS as well. Try it out &mdash; it might just work ;)
 
 ## Contributing
 
