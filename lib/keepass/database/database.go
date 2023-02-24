@@ -17,7 +17,6 @@ import (
 	"github.com/Zaphoood/tresor/lib/keepass/util"
 )
 
-// TODO: Consider moving constants to a separate file
 const (
 	WORD  = 2
 	DWORD = 4
