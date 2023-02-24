@@ -269,7 +269,10 @@ func (d *Database) SaveToPath(path string) error {
 	header := d.header.Copy()
 	header.randomize()
 
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
 	defer f.Close()
 	hash, err := header.write(f)
 	if err != nil {
