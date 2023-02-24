@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"sort"
 
 	"github.com/Zaphoood/tresor/lib/keepass/crypto"
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
@@ -20,6 +19,7 @@ import (
 
 // TODO: Consider moving constants to a separate file
 const (
+	// TODO: Replace with `sha256.Size`
 	SHA256_DIGEST_LEN = 32
 	WORD              = 2
 	DWORD             = 4
@@ -161,55 +161,50 @@ func (d *Database) checkStreamStartBytesAndTrim(plaintext *[]byte) bool {
 }
 
 func parseBlocks(plainBlocks []byte) ([]byte, error) {
-	blocks := make(map[uint32]block)
-	hashIndex := 0
-	totalSize := 0
-	i := 0
-	for i < len(plainBlocks) {
-		// Read block id
-		blockID := binary.LittleEndian.Uint32(plainBlocks[i : i+DWORD])
-		i += DWORD
-		if _, exists := blocks[blockID]; exists {
-			return nil, ParseError{fmt.Errorf("Duplicate block ID: %d", blockID)}
+	in := bytes.NewReader(plainBlocks)
+	var out bytes.Buffer
+	blockCounter := uint32(0)
+	for {
+		buf := make([]byte, DWORD)
+		err := util.ReadAssert(in, buf)
+		if err != nil {
+			return nil, err
 		}
-		// Store index of hash for later comparison
-		hashIndex = i
-		i += SHA256_DIGEST_LEN
+		blockID := binary.LittleEndian.Uint32(buf)
+		if blockID != blockCounter {
+			return nil, ParseError{fmt.Errorf("Invalid block ID: %d", blockID)}
+		}
+		blockCounter++
 
-		// Read block size
-		blockSize := int(binary.LittleEndian.Uint32(plainBlocks[i : i+DWORD]))
-		// Final block has block size 0
+		storedHash := make([]byte, SHA256_DIGEST_LEN)
+		util.ReadAssert(in, storedHash)
+
+		buf = make([]byte, DWORD)
+		err = util.ReadAssert(in, buf)
+		if err != nil {
+			return nil, err
+		}
+		blockSize := int(binary.LittleEndian.Uint32(buf))
 		if blockSize == 0 {
+			for _, b := range storedHash {
+				if b != 0 {
+					return nil, errors.New("Hash of final block must be zero")
+				}
+			}
 			break
 		}
-		i += DWORD
 
-		// Hash and compare
-		hash := sha256.Sum256(plainBlocks[i : i+blockSize])
-		if !bytes.Equal(hash[:], plainBlocks[hashIndex:hashIndex+SHA256_DIGEST_LEN]) {
+		content := make([]byte, blockSize)
+		util.ReadAssert(in, content)
+
+		hash := sha256.Sum256(content)
+		if !bytes.Equal(storedHash, hash[:]) {
 			return nil, ParseError{errors.New("Block hash does not match. File may be corrupted")}
 		}
-		blocks[blockID] = block{start: i, length: blockSize}
-		totalSize += blockSize
-		i += blockSize
+		out.Write(content)
 	}
 
-	// Concatenate blocks by order of their IDs
-	blockIDs := []int{}
-	for id := range blocks {
-		blockIDs = append(blockIDs, int(id))
-	}
-	sort.Ints(blockIDs)
-
-	out := make([]byte, totalSize)
-	pos := 0
-	for _, id := range blockIDs {
-		block := blocks[uint32(id)]
-		copy(out[pos:pos+block.length], plainBlocks[block.start:block.start+block.length])
-		pos += block.length
-	}
-
-	return out, nil
+	return out.Bytes(), nil
 }
 
 // formatBlocks formats the given byte array into blocks as per the kdbx file standard
