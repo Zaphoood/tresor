@@ -41,7 +41,7 @@ func ReadAssert(r io.Reader, b []byte) error {
 	return nil
 }
 
-func Unzip(in []byte) ([]byte, error) {
+func GUnzip(in []byte) ([]byte, error) {
 	out := make([]byte, 1024)
 	var outBuf bytes.Buffer
 	inBuf := bytes.NewBuffer(in)
@@ -61,4 +61,16 @@ func Unzip(in []byte) ([]byte, error) {
 	}
 
 	return outBuf.Bytes(), nil
+}
+
+func GZip(in []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := gzip.NewWriter(&buf)
+	err := WriteAssert(writer, in)
+	if err != nil {
+		return nil, err
+	}
+	writer.Close()
+
+	return buf.Bytes(), nil
 }

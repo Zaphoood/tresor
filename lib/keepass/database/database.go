@@ -144,7 +144,7 @@ func (d *Database) Decrypt() error {
 	d.plaintext = plaintext
 
 	if d.header.compression {
-		d.plaintext, err = util.Unzip(d.plaintext)
+		d.plaintext, err = util.GUnzip(d.plaintext)
 		if err != nil {
 			return err
 		}
@@ -286,7 +286,13 @@ func (d *Database) SaveToPath(path string) error {
 		return err
 	}
 
-	// Make plaintext blocks
+	if header.compression {
+		xml, err = util.GZip(xml)
+		if err != nil {
+			return err
+		}
+	}
+
 	plainBlocks, err := formatBocks(xml)
 	if err != nil {
 		return err
