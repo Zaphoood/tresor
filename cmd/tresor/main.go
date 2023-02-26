@@ -22,7 +22,6 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(path)
 
 	p := tea.NewProgram(tui.NewMainModel(path), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
