@@ -2,6 +2,12 @@
 
 A [KeePass](https://www.google.com/search?channel=fs&client=ubuntu&q=keepass) TUI written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Bubbles](https://github.com/charmbracelet/bubbles), featuring a [ranger](https://github.com/ranger/ranger)-inspired layout and vi-like keybindings.
 
+<p align="center">
+  <br>
+  <img src="./demo/demo.gif" width="90%"/>
+</p>
+<br>
+
 __⚠️ Disclaimer ⚠️__ I am not a cryptography expert. I cannot guarantee that this application is secure. Use at your own risk.
 
 ## Getting started
