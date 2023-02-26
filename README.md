@@ -23,7 +23,7 @@ If you just want to build the application, run
 ```
 go build ./cmd/tresor
 ```
-This will save the executable to the root of the project.
+This will save the executable to the working directory.
 
 ## Usage
 
@@ -52,11 +52,11 @@ Some features planned for the future are:
  * Auto-type
  * WebDAV integration (and possibly other file sharing protocols)
 
-The main goal is to implement all the core features provided by [KeePass](https://www.google.com/search?channel=fs&client=ubuntu&q=keepass).
+The main goal is to implement all the core features provided by [KeePass](https://keepass.info/).
 
 Note that currently, only Linux is actively supported, but the code should compile on Windows and macOS as well. Try it out &mdash; it might just work ;)
 
 ## Contributing
 
-If you find any bugs or have feature request, please file an issue.
+If you find any bugs or have a feature request, please file an issue.
 Pull requests are also welcome :)
