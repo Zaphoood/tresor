@@ -1,0 +1,41 @@
+name: Create demo gif
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "ci/vhs"
+
+jobs:
+  create-gif:
+    name: Create demo gif
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: demo
+
+    steps: 
+      - uses: actions/checkout@v3
+        with:
+          ref: ci/vhs
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+
+      - name: Install `tresor`
+        run: |
+          go build ../cmd/tresor
+          sudo cp tresor /bin
+
+      - name: Install VHS
+        run: |
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+          sudo snap install ttyd --classic
+          sudo apt update && sudo apt install vhs ffmpeg
+
+      - name: Render gif with VHS
+        run: |
+          vhs < demo.tape
+
