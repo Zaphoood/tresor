@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   create-gif:
@@ -55,3 +56,12 @@ jobs:
           commit_author: vhs-action <actions@github.com>
           file_pattern: '*.gif'
 
+      - name: Create pull request
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: "master"
+          pr_title: Update generated VHS GIF
+          pr_body: |
+            Automated PR for updating the GIF generated with [vhs](https://github.com/charmbracelet/vhs).
+
+            _Created by [repo-sync/pull-request](https://github.com/repo-sync/pull-request)_
