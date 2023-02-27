@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -73,8 +74,9 @@ func TestLoadSave(t *testing.T) {
 		{"../test/example_compressed.kdbx", "foo"},
 		{"../test/example.kdbx", "foo"},
 	}
+	path_out := "../test/saved.kdbx"
+
 	for _, file := range files {
-		path_out := "../test/saved.kdbx"
 
 		d := New(file.path)
 		if !assert.Nil(d.Load()) {
@@ -103,6 +105,9 @@ func TestLoadSave(t *testing.T) {
 			return
 		}
 	}
+
+	// Clean up
+	os.Remove(path_out)
 }
 
 func TestErrors(t *testing.T) {
