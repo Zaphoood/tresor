@@ -79,7 +79,7 @@ func (n *Navigate) resizeAll() {
 	selectorWidth := int(float64(n.windowWidth) * 0.3)
 	previewWidth := int(float64(n.windowWidth) * 0.5)
 	parentWidth := n.windowWidth - selectorWidth - previewWidth
-	height := n.windowHeight - 1
+	height := n.windowHeight
 
 	n.parent.SetSize(parentWidth, height)
 	n.selector.SetSize(selectorWidth, height)

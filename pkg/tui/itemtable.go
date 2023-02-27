@@ -97,7 +97,9 @@ func (t *itemTable) Sorted() bool {
 }
 
 func (t *itemTable) Clear() {
-	t.SetRows([]table.Row{})
+	// Must set empty row, in order for truncateHeader to work
+	// Otherwise an empty string would be returned from View(), which messes up the formatting
+	t.SetRows([]table.Row{{"", ""}})
 	t.uuids = []string{}
 }
 
@@ -112,7 +114,7 @@ func (t itemTable) Update(msg tea.Msg) (itemTable, tea.Cmd) {
 }
 
 func (t *itemTable) View() string {
-	return t.Model.View()
+	return truncateHeader(t.Model.View())
 }
 
 func (t *itemTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
@@ -228,4 +230,14 @@ func (t *itemTable) FocusedUUID() string {
 		return ""
 	}
 	return t.uuids[t.Cursor()]
+}
+
+// truncateHeader removes the header of a bubbles.Table by
+// deleting everything up to (and including the first newline)
+func truncateHeader(s string) string {
+	split := strings.SplitN(s, "\n", 2)
+	if len(split) < 2 {
+		return split[0]
+	}
+	return split[1]
 }
