@@ -34,17 +34,15 @@ func NewMainModel(d *database.Database) MainModel {
 }
 
 func (m MainModel) Init() tea.Cmd {
+	if m.database != nil {
+		return func() tea.Msg { return loadDoneMsg{m.database} }
+	}
 	return nil
 }
 
 func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
-
-	if m.database != nil {
-		cmds = append(cmds, m.initDecryptView(m.database))
-		m.database = nil
-	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
