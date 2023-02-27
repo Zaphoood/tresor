@@ -14,10 +14,6 @@ jobs:
     name: Create demo gif
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: demo
-
     steps: 
       - uses: actions/checkout@v3
         with:
@@ -28,13 +24,19 @@ jobs:
 
       - name: Install `tresor`
         run: |
-          go build ../cmd/tresor
+          go build ./cmd/tresor
           sudo cp tresor /bin
+
+      - name: Prepare files for gif recording
+        run: mv demo/mypasswords.kdbx .
 
       - name: Render gif with VHS
         uses: charmbracelet/vhs-action@v1
         with:
-          path: 'demo.tape'
+          path: './demo/demo.tape'
+
+      - name: Move gif to `demo/` directory
+        run: mv demo.gif demo/
 
       - name: Create commit
         uses: stefanzweifel/git-auto-commit-action@v4
@@ -42,7 +44,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           commit_message: Update generated VHS GIF
-          branch: ci/vhs-generated-gif
+          branch: ci/vhs
           commit_user_name: vhs-action
           commit_user_email: actions@github.com
           commit_author: vhs-action <actions@github.com>
