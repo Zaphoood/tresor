@@ -32,7 +32,7 @@ func fileSelectedCmd(path string) tea.Cmd {
 		if err != nil {
 			return loadFailedMsg{err}
 		}
-		return loadDoneMsg{&db}
+		return loadDoneMsg{db}
 	}
 }
 

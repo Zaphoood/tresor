@@ -3,6 +3,7 @@ package tui
 import (
 	"log"
 
+	database "github.com/Zaphoood/tresor/lib/keepass/database"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -20,21 +21,21 @@ type MainModel struct {
 	selectFile tea.Model
 	decrypt    tea.Model
 	navigate   tea.Model
-	// Instead of asking the user for input, the path can be set upon construction
-	// This is useful for passing command line arguments
-	forcePath string
+	// Instead of asking the user for input, a database can be passed upon construction
+	// This is useful when files are openend via command line arguments
+	database *database.Database
 
 	windowWidth  int
 	windowHeight int
 }
 
-func NewMainModel(path string) MainModel {
-	return MainModel{view: selectFileView, selectFile: NewSelectFile(), forcePath: path}
+func NewMainModel(d *database.Database) MainModel {
+	return MainModel{view: selectFileView, selectFile: NewSelectFile(), database: d}
 }
 
 func (m MainModel) Init() tea.Cmd {
-	if len(m.forcePath) > 0 {
-		return fileSelectedCmd(m.forcePath)
+	if m.database != nil {
+		return func() tea.Msg { return loadDoneMsg{m.database} }
 	}
 	return nil
 }
@@ -48,15 +49,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
 	case loadDoneMsg:
-		m.view = decryptView
-		m.decrypt = NewDecrypt(msg.database, m.windowWidth, m.windowHeight)
-		cmd = m.decrypt.Init()
-		cmds = append(cmds, cmd)
+		cmds = append(cmds, m.initDecryptView(msg.database))
 	case decryptDoneMsg:
-		m.view = navigateView
-		m.navigate = NewNavigate(msg.database, m.windowWidth, m.windowHeight)
-		cmd = m.navigate.Init()
-		cmds = append(cmds, cmd)
+		cmds = append(cmds, m.initNavigateView(msg.database))
 	case globalResizeMsg:
 		m.windowWidth = msg.width
 		m.windowHeight = msg.height
@@ -92,6 +87,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *MainModel) initDecryptView(d *database.Database) tea.Cmd {
+	m.view = decryptView
+	m.decrypt = NewDecrypt(d, m.windowWidth, m.windowHeight)
+	return m.decrypt.Init()
+}
+
+func (m *MainModel) initNavigateView(d *database.Database) tea.Cmd {
+	m.view = navigateView
+	m.navigate = NewNavigate(d, m.windowWidth, m.windowHeight)
+	return m.navigate.Init()
+}
+
 func (m MainModel) View() string {
 	switch m.view {
 	case selectFileView:
@@ -101,7 +108,7 @@ func (m MainModel) View() string {
 	case navigateView:
 		return m.navigate.View()
 	default:
-		log.Fatalf("Invalid view: %d", m.view)
+		log.Printf("ERROR: Invalid view: %d", m.view)
 		return "Invalid view: %d"
 	}
 }
