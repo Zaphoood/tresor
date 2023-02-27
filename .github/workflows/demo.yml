@@ -31,17 +31,10 @@ jobs:
           go build ../cmd/tresor
           sudo cp tresor /bin
 
-      - name: Install VHS
-        run: |
-          sudo mkdir -p /etc/apt/keyrings
-          curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
-          echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
-          sudo snap install ttyd --classic
-          sudo apt update && sudo apt install vhs ffmpeg
-
       - name: Render gif with VHS
-        run: |
-          vhs < demo.tape
+        uses: charmbracelet/vhs-action@v1
+        with:
+          path: 'demo.tape'
 
       - name: Create commit
         uses: stefanzweifel/git-auto-commit-action@v4
@@ -49,7 +42,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           commit_message: Update generated VHS GIF
-          branch: ci/vhs
+          branch: ci/vhs-generated-gif
           commit_user_name: vhs-action
           commit_user_email: actions@github.com
           commit_author: vhs-action <actions@github.com>
