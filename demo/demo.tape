@@ -1,5 +1,6 @@
 Output demo.gif
 
+Set Shell "bash"
 Set TypingSpeed 150ms
 Set Width 2000
 Set Height 1200
