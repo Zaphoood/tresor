@@ -34,6 +34,9 @@ jobs:
           sudo apt install -y libx11-dev xvfb
           Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
 
+      - name: Install neofetch
+        run: sudo apt install -y neofetch
+
       - name: Render gif with VHS
         uses: charmbracelet/vhs-action@v1
         with:

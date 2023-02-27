@@ -8,6 +8,10 @@ Set FontSize 20
 
 Require tresor
 
+Type "neofetch"
+Enter
+Sleep 5s
+
 Type "tresor mypasswor"
 Tab
 Sleep 500ms
