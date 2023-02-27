@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Zaphoood/tresor/lib/keepass/database"
 	"github.com/Zaphoood/tresor/pkg/tui"
 	"github.com/Zaphoood/tresor/pkg/util"
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,9 +24,19 @@ func main() {
 		return
 	}
 
-	p := tea.NewProgram(tui.NewMainModel(path), tea.WithAltScreen())
+	var d *database.Database = nil
+	if len(path) > 0 {
+		d = database.New(path)
+		err = d.Load()
+		if err != nil {
+			fmt.Printf("Error while opening %s: %s\n", path, err)
+			return
+		}
+	}
+
+	p := tea.NewProgram(tui.NewMainModel(d), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error: %s", err)
+		fmt.Printf("Error while running TUI: %s", err)
 		os.Exit(1)
 	}
 }

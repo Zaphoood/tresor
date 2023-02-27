@@ -50,8 +50,8 @@ type Database struct {
 	parsed     *parser.Document
 }
 
-func New(path string) Database {
-	return Database{
+func New(path string) *Database {
+	return &Database{
 		path: path,
 	}
 }
