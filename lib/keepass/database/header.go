@@ -205,6 +205,9 @@ func (h *header) read(stream *os.File) error {
 	if err != nil {
 		return err
 	}
+	if h.version.major != 3 || h.version.minor != 1 {
+		return FileError(errors.New("Only kdbx version 3.1 is supported"))
+	}
 
 	headerMap := make(map[headerCode][]byte)
 	bufType := make([]byte, TLV_TYPE_LEN)
