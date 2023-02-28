@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -13,10 +16,10 @@ type CommandLine struct {
 	message   string
 	// callback is called after a command is entered. If the bool returned by the function
 	// is true, then the string return value will be set as the new status message
-	callback func(string) (tea.Cmd, bool, string)
+	callback func([]string) (tea.Cmd, bool, string)
 }
 
-func NewCommandLine(callback func(string) (tea.Cmd, bool, string)) CommandLine {
+func NewCommandLine(callback func([]string) (tea.Cmd, bool, string)) CommandLine {
 	input := textinput.New()
 	input.Prompt = ""
 	return CommandLine{
@@ -78,11 +81,24 @@ func (c *CommandLine) resetPrompt() {
 
 func (c *CommandLine) onCommandInput() tea.Cmd {
 	c.endInputMode()
-	cmd, updateMessage, message := c.callback(c.input.Value())
+	cmdAsStrings, err := parseInputAsCommand(c.input.Value())
+	if err != nil {
+		// Input could not be parsed as command
+		// TODO: Consider displaying error message here
+		return nil
+	}
+	cmd, updateMessage, message := c.callback(cmdAsStrings)
 	if updateMessage {
 		c.message = message
 	}
 	return cmd
+}
+
+func parseInputAsCommand(input string) ([]string, error) {
+	if len(input) == 0 || input[0] != byte(':') {
+		return nil, fmt.Errorf("ERROR: Commands must start with ':', got command '%s'\n", input)
+	}
+	return strings.Split(input[1:], " "), nil
 }
 
 func (c *CommandLine) endInputMode() {
