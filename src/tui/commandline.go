@@ -22,23 +22,15 @@ type CommandLine struct {
 	input     textinput.Model
 	inputMode inputMode
 	message   string
-	// cmdFunc is called after a command is entered.
-	// The command returned will be returned from the Update() function and handled by bubbletea,
-	// the string returned will be set as the new status message
-	cmdFunc func([]string) (tea.Cmd, string)
-	// searchFunc is called with the users search query
-	searchFunc func(string) (tea.Cmd, string)
 }
 
-func NewCommandLine(cmdFunc func([]string) (tea.Cmd, string), searchFunc func(string) (tea.Cmd, string)) CommandLine {
+func NewCommandLine() CommandLine {
 	input := textinput.New()
 	input.Prompt = ""
 	return CommandLine{
-		input:      input,
-		inputMode:  inputNone,
-		message:    DEFAULT_MESSAGE,
-		cmdFunc:    cmdFunc,
-		searchFunc: searchFunc,
+		input:     input,
+		inputMode: inputNone,
+		message:   DEFAULT_MESSAGE,
 	}
 }
 
@@ -114,26 +106,24 @@ func (c *CommandLine) onEnter() tea.Cmd {
 
 func (c *CommandLine) onCommandInput() tea.Cmd {
 	c.endInputMode()
+	c.message = c.input.Value()
 	cmdAsStrings, err := parseInputAsCommand(c.input.Value())
 	if err != nil {
 		// Input could not be parsed as command
 		// TODO: Consider displaying error message here
 		return nil
 	}
-	var cmd tea.Cmd
-	cmd, c.message = c.cmdFunc(cmdAsStrings)
-	return cmd
+	return func() tea.Msg { return commandInputMsg{cmdAsStrings} }
 }
 
 func (c *CommandLine) onSearchInput() tea.Cmd {
 	c.endInputMode()
+	c.message = c.input.Value()
 	inputAsSearch, err := parseInputAsSearch(c.input.Value())
 	if err != nil {
 		return nil
 	}
-	var cmd tea.Cmd
-	cmd, c.message = c.searchFunc(inputAsSearch)
-	return cmd
+	return func() tea.Msg { return searchInputMsg{inputAsSearch} }
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
@@ -185,4 +175,12 @@ func (c CommandLine) IsInputActive() bool {
 
 func (c CommandLine) GetHeight() int {
 	return 1
+}
+
+type commandInputMsg struct {
+	cmd []string
+}
+
+type searchInputMsg struct {
+	query string
 }
