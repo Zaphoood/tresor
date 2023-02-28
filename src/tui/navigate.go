@@ -185,9 +185,10 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 }
 
 func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, string) {
-	switch cmd[0] {
-	case "":
+	if len(cmd) == 0 {
 		return nil, ""
+	}
+	switch cmd[0] {
 	case "q":
 		return n.handleQuitCmd(cmd)
 	case "w":

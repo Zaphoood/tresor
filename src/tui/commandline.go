@@ -97,7 +97,15 @@ func parseInputAsCommand(input string) ([]string, error) {
 	if len(input) == 0 || input[0] != byte(':') {
 		return nil, fmt.Errorf("ERROR: Commands must start with ':', got command '%s'\n", input)
 	}
-	return strings.Split(input[1:], " "), nil
+	// Clean out empty strings
+	split := strings.Split(input[1:], " ")
+	cmd := make([]string, 0)
+	for _, s := range split {
+		if len(s) > 0 {
+			cmd = append(cmd, s)
+		}
+	}
+	return cmd, nil
 }
 
 func (c *CommandLine) endInputMode() {
