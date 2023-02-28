@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
@@ -28,6 +29,7 @@ type Navigate struct {
 	entryPreview entryTable
 	focusedItem  parser.Item
 	lastCursor   map[string]string
+	cmdLine      CommandLine
 
 	path []string
 	err  error
@@ -48,6 +50,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		windowHeight: windowHeight,
 		database:     database,
 	}
+	n.cmdLine = NewCommandLine(n.handleCommand)
 	n.parent = newGroupTable(n.styles, itemViewColumns, true)
 	n.selector = newGroupTable(n.styles, itemViewColumns, true, table.WithFocused(true))
 	n.groupPreview = newGroupTable(n.styles, itemViewColumns, true)
@@ -74,7 +77,7 @@ func (n *Navigate) resizeAll() {
 	selectorWidth := int(float64(n.windowWidth) * 0.3)
 	previewWidth := int(float64(n.windowWidth) * 0.5)
 	parentWidth := n.windowWidth - selectorWidth - previewWidth
-	height := n.windowHeight
+	height := n.windowHeight - n.cmdLine.GetHeight()
 
 	n.parent.Resize(parentWidth, height)
 	n.selector.Resize(selectorWidth, height)
@@ -181,6 +184,13 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChange)
 }
 
+func (n *Navigate) handleCommand(cmd string) (tea.Cmd, bool, string) {
+	if cmd == ":q" {
+		return tea.Quit, false, ""
+	}
+	return nil, true, fmt.Sprintf("[Navigate] You said: '%s'", cmd)
+}
+
 func clearClipboard() {
 	clipboard.Write(clipboard.FmtText, []byte(""))
 }
@@ -190,6 +200,8 @@ func (n Navigate) Init() tea.Cmd {
 }
 
 func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case clearClipboardMsg:
 		clearClipboard()
@@ -199,27 +211,33 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
-			clearClipboard()
-			return n, tea.Quit
-		case "enter":
-			cmd := n.copyToClipboard()
-			return n, cmd
-		case "l":
-			n.moveRight()
-		case "h":
-			n.moveLeft()
+		if !n.cmdLine.IsInputMode() {
+			switch msg.String() {
+			case "ctrl+c":
+				clearClipboard()
+				return n, tea.Quit
+			case "enter":
+				cmd := n.copyToClipboard()
+				return n, cmd
+			case "l":
+				n.moveRight()
+			case "h":
+				n.moveLeft()
+			}
 		}
+		n.cmdLine, cmd = n.cmdLine.Update(msg)
+		cmds = append(cmds, cmd)
 	}
-	var cmd tea.Cmd
-	cursor := n.selector.Cursor()
-	n.selector, cmd = n.selector.Update(msg)
-	if cursor != n.selector.Cursor() {
-		n.updatePreview()
+	if !n.cmdLine.IsInputMode() {
+		cursor := n.selector.Cursor()
+		n.selector, cmd = n.selector.Update(msg)
+		if cursor != n.selector.Cursor() {
+			n.updatePreview()
+		}
+		cmds = append(cmds, cmd)
 	}
 
-	return n, cmd
+	return n, tea.Batch(cmds...)
 }
 
 func (n Navigate) View() string {
@@ -230,5 +248,6 @@ func (n Navigate) View() string {
 	case parser.Entry:
 		preview = n.entryPreview.View()
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, n.parent.View(), n.selector.View(), preview)
+	tables := lipgloss.JoinHorizontal(lipgloss.Top, n.parent.View(), n.selector.View(), preview)
+	return lipgloss.JoinVertical(lipgloss.Left, tables, n.cmdLine.View())
 }
