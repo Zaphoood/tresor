@@ -113,25 +113,25 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 	t.LoadGroup(group, lastSelected)
 }
 
-func (t *groupTable) LoadGroup(group parser.Group, lastSelected *map[string]string) {
-	if len(group.Groups) == 0 && len(group.Entries) == 0 {
+func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
+	if len(group.Groups) + len(group.Entries) == 0 {
 		t.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
 		t.SetStyles(t.stylesEmpty)
 		t.uuids = []string{}
-	} else {
-		t.SetItems(group.Groups, group.Entries)
-		t.SetStyles(t.styles)
-		t.SetCursor(0)
-		lastSelected, ok := (*lastSelected)[group.UUID]
-		if !ok {
-			return
-		}
-		for i, uuid := range t.uuids {
-			if uuid == lastSelected {
-				t.SetCursor(i)
-			}
+		return
+	}
+	t.SetItems(group.Groups, group.Entries)
+	t.SetStyles(t.styles)
+	t.SetCursor(0)
+	lastCursor, ok := (*lastCursors)[group.UUID]
+	if !ok {
+		return
+	}
+	for i, uuid := range t.uuids {
+		if uuid == lastCursor {
+			t.SetCursor(i)
 		}
 	}
 }
