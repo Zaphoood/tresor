@@ -50,7 +50,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		windowHeight: windowHeight,
 		database:     database,
 	}
-	n.cmdLine = NewCommandLine(n.handleCommand)
+	n.cmdLine = NewCommandLine(n.handleCommand, n.handleSearch)
 	n.parent = newGroupTable(n.styles, itemViewColumns, true)
 	n.selector = newGroupTable(n.styles, itemViewColumns, true, table.WithFocused(true))
 	n.groupPreview = newGroupTable(n.styles, itemViewColumns, true)
@@ -235,6 +235,10 @@ func (n *Navigate) handleEditCmd(cmd []string) (tea.Cmd, string) {
 		path = cmd[1]
 	}
 	return fileSelectedCmd(path), "Reloading..."
+}
+
+func (n *Navigate) handleSearch(query string) (tea.Cmd, string) {
+	return nil, fmt.Sprintf("[Navigate] You searched for '%s'", query)
 }
 
 func clearClipboard() {

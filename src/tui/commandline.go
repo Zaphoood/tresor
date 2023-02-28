@@ -22,20 +22,23 @@ type CommandLine struct {
 	input     textinput.Model
 	inputMode inputMode
 	message   string
-	// callback is called after a command is entered.
+	// cmdFunc is called after a command is entered.
 	// The command returned will be returned from the Update() function and handled by bubbletea,
 	// the string returned will be set as the new status message
-	callback func([]string) (tea.Cmd, string)
+	cmdFunc func([]string) (tea.Cmd, string)
+	// searchFunc is called with the users search query
+	searchFunc func(string) (tea.Cmd, string)
 }
 
-func NewCommandLine(callback func([]string) (tea.Cmd, string)) CommandLine {
+func NewCommandLine(cmdFunc func([]string) (tea.Cmd, string), searchFunc func(string) (tea.Cmd, string)) CommandLine {
 	input := textinput.New()
 	input.Prompt = ""
 	return CommandLine{
-		input:     input,
-		inputMode: inputNone,
-		message:   DEFAULT_MESSAGE,
-		callback:  callback,
+		input:      input,
+		inputMode:  inputNone,
+		message:    DEFAULT_MESSAGE,
+		cmdFunc:    cmdFunc,
+		searchFunc: searchFunc,
 	}
 }
 
@@ -118,19 +121,24 @@ func (c *CommandLine) onCommandInput() tea.Cmd {
 		return nil
 	}
 	var cmd tea.Cmd
-	cmd, c.message = c.callback(cmdAsStrings)
+	cmd, c.message = c.cmdFunc(cmdAsStrings)
 	return cmd
 }
 
 func (c *CommandLine) onSearchInput() tea.Cmd {
 	c.endInputMode()
-	c.message = fmt.Sprintf("You searched for '%s'", c.input.Value())
-	return nil
+	inputAsSearch, err := parseInputAsSearch(c.input.Value())
+	if err != nil {
+		return nil
+	}
+	var cmd tea.Cmd
+	cmd, c.message = c.searchFunc(inputAsSearch)
+	return cmd
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
 	if len(input) == 0 || input[0] != byte(':') {
-		return nil, fmt.Errorf("ERROR: Commands must start with ':', got command '%s'\n", input)
+		return nil, fmt.Errorf("ERROR: Commands must start with ':', got '%s'\n", input)
 	}
 	// Clean out empty strings
 	split := strings.Split(input[1:], " ")
@@ -141,6 +149,13 @@ func parseInputAsCommand(input string) ([]string, error) {
 		}
 	}
 	return cmd, nil
+}
+
+func parseInputAsSearch(input string) (string, error) {
+	if len(input) == 0 || input[0] != byte('/') {
+		return "", fmt.Errorf("ERROR: Search must start with '/', got '%s'\n", input)
+	}
+	return input[1:], nil
 }
 
 func (c *CommandLine) endInputMode() {
