@@ -113,6 +113,9 @@ func (c *CommandLine) onCommandInput() tea.Cmd {
 		// TODO: Consider displaying error message here
 		return nil
 	}
+	if len(cmdAsStrings) == 0 {
+		return nil
+	}
 	return func() tea.Msg { return commandInputMsg{cmdAsStrings} }
 }
 

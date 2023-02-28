@@ -184,7 +184,6 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 
 func (n *Navigate) handleCommand(cmd []string) tea.Cmd {
 	if len(cmd) == 0 {
-		n.cmdLine.SetMessage("")
 		return nil
 	}
 	switch cmd[0] {
