@@ -76,6 +76,25 @@ type decryptFailedMsg struct {
 	err error
 }
 
+func saveCmd(d *database.Database) tea.Cmd {
+	return func() tea.Msg {
+		err := d.Save()
+		if err == nil {
+			return saveDoneMsg{d.Path()}
+		} else {
+			return saveFailedMsg{err}
+		}
+	}
+}
+
+type saveDoneMsg struct {
+	path string
+}
+
+type saveFailedMsg struct {
+	err error
+}
+
 func scheduleClearClipboard(delay int, notify <-chan struct{}) tea.Cmd {
 	return func() tea.Msg {
 		select {

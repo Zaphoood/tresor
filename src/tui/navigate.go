@@ -195,6 +195,8 @@ func (n *Navigate) handleCommand(cmd string) (tea.Cmd, bool, string) {
 	case "q":
 		clearClipboard()
 		return tea.Quit, true, "Bye-bye!"
+	case "w":
+		return saveCmd(n.database), true, "Saving..."
 	default:
 		return nil, true, fmt.Sprintf("Not a command: %s", cmd)
 	}
@@ -214,6 +216,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case clearClipboardMsg:
 		clearClipboard()
+	case saveDoneMsg:
+		n.cmdLine.SetMessage(fmt.Sprintf("Saved to %s", msg.path))
+	case saveFailedMsg:
+		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
