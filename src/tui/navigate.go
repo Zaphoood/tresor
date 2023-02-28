@@ -196,7 +196,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
-		//n.resizeAll()
+		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
