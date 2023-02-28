@@ -184,11 +184,19 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChange)
 }
 
-func (n *Navigate) handleCommand(cmd string) (tea.Cmd, bool, string) {
-	if cmd == ":q" {
-		return tea.Quit, false, ""
+func (n *Navigate) handleCommand(cmd string) (tea.Cmd,bool, string) {
+	if len(cmd) == 0 || cmd[0] != byte(':') {
+		return nil, true, fmt.Sprintf("ERROR: Commands must start with ':', got command '%s'\n", cmd)
 	}
-	return nil, true, fmt.Sprintf("[Navigate] You said: '%s'", cmd)
+	cmd = cmd[1:]
+	switch cmd {
+	case "":
+		return nil, true, ""
+	case "q":
+		return tea.Quit, true, "Bye-bye!"
+	default:
+		return nil, true, fmt.Sprintf("Not a command: %s", cmd)
+	}
 }
 
 func clearClipboard() {
