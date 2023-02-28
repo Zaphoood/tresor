@@ -38,7 +38,9 @@ Sleep 1s
 
 Type@500ms "jj"
 Sleep 1.5s
-Ctrl+C
+Type ":q"
+Sleep 1s
+Enter
 Sleep 1s
 Ctrl+D
 
