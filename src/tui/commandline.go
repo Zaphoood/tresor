@@ -10,9 +10,17 @@ import (
 
 const DEFAULT_MESSAGE = "Ready."
 
+type inputMode int
+
+const (
+	inputNone inputMode = iota
+	inputCommand
+	inputSearch
+)
+
 type CommandLine struct {
 	input     textinput.Model
-	inputMode bool
+	inputMode inputMode
 	message   string
 	// callback is called after a command is entered.
 	// The command returned will be returned from the Update() function and handled by bubbletea,
@@ -25,7 +33,7 @@ func NewCommandLine(callback func([]string) (tea.Cmd, string)) CommandLine {
 	input.Prompt = ""
 	return CommandLine{
 		input:     input,
-		inputMode: false,
+		inputMode: inputNone,
 		message:   DEFAULT_MESSAGE,
 		callback:  callback,
 	}
@@ -38,46 +46,67 @@ func (c CommandLine) Init() tea.Cmd {
 func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
-		if c.inputMode {
+		if c.inputMode == inputNone {
 			switch msg.String() {
-			case "esc", "ctrl+c":
+			case ":":
+				c.inputMode = inputCommand
+				c.input.Focus()
+				c.resetPrompt()
+			case "/":
+				c.inputMode = inputSearch
+				c.input.Focus()
+				c.resetPrompt()
+			}
+			return c, nil
+		}
+
+		switch msg.String() {
+		case "esc", "ctrl+c":
+			c.endInputMode()
+			return c, nil
+		case "enter":
+			return c, c.onEnter()
+		}
+
+		c.input, cmd = c.input.Update(msg)
+
+		switch msg.String() {
+		case "backspace":
+			if len(c.input.Value()) == 0 {
 				c.endInputMode()
 				return c, nil
-			case "enter":
-				return c, c.onCommandInput()
 			}
-
-			c.input, cmd = c.input.Update(msg)
-
-			switch msg.String() {
-			case "backspace":
-				if len(c.input.Value()) == 0 {
-					c.endInputMode()
-					return c, nil
-				}
-			case "ctrl+w":
-				if len(c.input.Value()) == 0 {
-					c.resetPrompt()
-					return c, nil
-				}
-			}
-
-			return c, cmd
-		} else {
-			if msg.String() == ":" {
-				c.inputMode = true
-				c.input.Focus()
+		case "ctrl+w":
+			if len(c.input.Value()) == 0 {
 				c.resetPrompt()
 				return c, nil
 			}
 		}
+
+		return c, cmd
 	}
 	return c, nil
 }
 
 func (c *CommandLine) resetPrompt() {
-	c.input.SetValue(":")
-	c.input.SetCursor(1)
+	switch c.inputMode {
+	case inputCommand:
+		c.input.SetValue(":")
+		c.input.SetCursor(1)
+	case inputSearch:
+		c.input.SetValue("/")
+		c.input.SetCursor(1)
+	}
+}
+
+func (c *CommandLine) onEnter() tea.Cmd {
+	switch c.inputMode {
+	case inputCommand:
+		return c.onCommandInput()
+	case inputSearch:
+		return c.onSearchInput()
+	}
+	return nil
 }
 
 func (c *CommandLine) onCommandInput() tea.Cmd {
@@ -91,6 +120,12 @@ func (c *CommandLine) onCommandInput() tea.Cmd {
 	var cmd tea.Cmd
 	cmd, c.message = c.callback(cmdAsStrings)
 	return cmd
+}
+
+func (c *CommandLine) onSearchInput() tea.Cmd {
+	c.endInputMode()
+	c.message = fmt.Sprintf("You searched for '%s'", c.input.Value())
+	return nil
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
@@ -109,24 +144,28 @@ func parseInputAsCommand(input string) ([]string, error) {
 }
 
 func (c *CommandLine) endInputMode() {
-	c.inputMode = false
+	c.inputMode = inputNone
 	c.input.Blur()
 	c.message = DEFAULT_MESSAGE
 }
 
 func (c CommandLine) View() string {
-	if c.inputMode {
+	switch c.inputMode {
+	case inputNone:
+		return c.message
+	case inputCommand, inputSearch:
 		return c.input.View()
+	default:
+		panic(fmt.Sprintf("ERROR: Invalid input mode %d", c.inputMode))
 	}
-	return c.message
 }
 
 func (c *CommandLine) SetMessage(msg string) {
 	c.message = msg
 }
 
-func (c CommandLine) IsInputMode() bool {
-	return c.inputMode
+func (c CommandLine) IsInputActive() bool {
+	return c.inputMode != inputNone
 }
 
 func (c CommandLine) GetHeight() int {

@@ -267,7 +267,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		if !n.cmdLine.IsInputMode() {
+		if !n.cmdLine.IsInputActive() {
 			switch msg.String() {
 			case "ctrl+c":
 				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
@@ -283,7 +283,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		cmds = append(cmds, cmd)
 	}
-	if !n.cmdLine.IsInputMode() {
+	if !n.cmdLine.IsInputActive() {
 		cursor := n.selector.Cursor()
 		n.selector, cmd = n.selector.Update(msg)
 		if cursor != n.selector.Cursor() {
