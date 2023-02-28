@@ -29,12 +29,7 @@ var defaultFields []entryField = []entryField{
 	{"Password", "Password", ""},
 }
 
-//type sizedColumn struct {
-//	name  string
-//	width int
-//}
-
-type itemTable struct {
+type groupTable struct {
 	table.Model
 	styles      table.Styles
 	stylesEmpty table.Styles
@@ -43,8 +38,8 @@ type itemTable struct {
 	uuids       []string
 }
 
-func newItemTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) itemTable {
-	return itemTable{
+func newGroupTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) groupTable {
+	return groupTable{
 		Model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
 		stylesEmpty: table.Styles{
@@ -59,9 +54,9 @@ func newItemTable(styles table.Styles, columns []table.Column, sorted bool, opti
 	}
 }
 
-// Set size will set all columns to their given size and additionally scale oone column with width 0 dynamically
+// Resize will set all columns to their given size and additionally scale oone column with width 0 dynamically
 // to fit the width of the table. Don't set the width to 0 for more than one column -- it won't work
-func (t *itemTable) SetSize(width, height int) {
+func (t *groupTable) Resize(width, height int) {
 	t.SetWidth(width)
 	t.SetHeight(height)
 	totalFixed := 0
@@ -88,36 +83,36 @@ func (t *itemTable) SetSize(width, height int) {
 	t.SetColumns(newColumns)
 }
 
-func (t *itemTable) SetSorted(v bool) {
+func (t *groupTable) SetSorted(v bool) {
 	t.sorted = v
 }
 
-func (t *itemTable) Sorted() bool {
+func (t *groupTable) Sorted() bool {
 	return t.sorted
 }
 
-func (t *itemTable) Clear() {
+func (t *groupTable) Clear() {
 	// Must set empty row, in order for truncateHeader to work
 	// Otherwise an empty string would be returned from View(), which messes up the formatting
 	t.SetRows([]table.Row{{"", ""}})
 	t.uuids = []string{}
 }
 
-func (t *itemTable) Init() tea.Cmd {
+func (t *groupTable) Init() tea.Cmd {
 	return nil
 }
 
-func (t itemTable) Update(msg tea.Msg) (itemTable, tea.Cmd) {
+func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
 	var cmd tea.Cmd
 	t.Model, cmd = t.Model.Update(msg)
 	return t, cmd
 }
 
-func (t *itemTable) View() string {
+func (t *groupTable) View() string {
 	return truncateHeader(t.Model.View())
 }
 
-func (t *itemTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
+func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
 		t.SetRows([]table.Row{
@@ -133,7 +128,7 @@ func (t *itemTable) Load(d *parser.Document, path []string, lastSelected *map[st
 	t.LoadGroup(group, lastSelected)
 }
 
-func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]string) {
+func (t *groupTable) LoadGroup(group parser.Group, lastSelected *map[string]string) {
 	if len(group.Groups) == 0 && len(group.Entries) == 0 {
 		t.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
@@ -156,7 +151,7 @@ func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]strin
 	}
 }
 
-func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
+func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	rows := make([]table.Row, 0, len(groups)+len(entries))
 	t.uuids = make([]string, 0, len(groups)+len(entries))
 	groupsSorted := make([]*parser.Group, 0, len(groups))
@@ -194,7 +189,55 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	t.SetRows(rows)
 }
 
-func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
+func (t *groupTable) FocusedUUID() string {
+	if len(t.uuids) == 0 {
+		return ""
+	}
+	return t.uuids[t.Cursor()]
+}
+
+type entryTable struct {
+	table.Model
+	styles  table.Styles
+	columns []table.Column
+}
+
+func newEntryTable(styles table.Styles, columns []table.Column, options ...table.Option) entryTable {
+	return entryTable{
+		Model:   table.New(append(options, table.WithStyles(styles))...),
+		styles:  styles,
+		columns: columns,
+	}
+}
+
+func (t *entryTable) Resize(width, height int) {
+	t.SetWidth(width)
+	t.SetHeight(height)
+	totalFixed := 0
+	dynamicIndex := -1
+	for i, column := range t.columns {
+		if column.Width == 0 {
+			dynamicIndex = i
+		}
+		totalFixed += column.Width
+	}
+
+	newColumns := make([]table.Column, len(t.columns))
+	for i := range newColumns {
+		newColumns[i] = table.Column{
+			Title: t.columns[i].Title,
+		}
+		if i == dynamicIndex {
+			newColumns[i].Width = width - totalFixed - 2*t.styles.Header.GetPaddingLeft() - 2*t.styles.Header.GetPaddingLeft()
+		} else {
+			newColumns[i].Width = t.columns[i].Width
+		}
+	}
+
+	t.SetColumns(newColumns)
+}
+
+func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	rows := make([]table.Row, 0, len(entry.Strings))
 	visited := make(map[string]struct{})
 	var value string
@@ -222,18 +265,10 @@ func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		rows = append(rows, table.Row{field.Key, value})
 	}
 	t.SetRows(rows)
-	t.uuids = []string{}
-}
-
-func (t *itemTable) FocusedUUID() string {
-	if len(t.uuids) == 0 {
-		return ""
-	}
-	return t.uuids[t.Cursor()]
 }
 
 // truncateHeader removes the header of a bubbles.Table by
-// deleting everything up to (and including the first newline)
+// deleting everything up to (and including) the first newline
 func truncateHeader(s string) string {
 	split := strings.SplitN(s, "\n", 2)
 	if len(split) < 2 {
