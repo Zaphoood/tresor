@@ -21,16 +21,11 @@ var itemViewColumns []table.Column = []table.Column{
 	{Title: "Entries", Width: 7},
 }
 
-var entryViewColumns []table.Column = []table.Column{
-	{Title: "Key", Width: 40},
-	{Title: "Value", Width: 0},
-}
-
 type Navigate struct {
-	parent       itemTable
-	selector     itemTable
-	groupPreview itemTable
-	entryPreview itemTable
+	parent       groupTable
+	selector     groupTable
+	groupPreview groupTable
+	entryPreview entryTable
 	focusedItem  parser.Item
 	lastCursor   map[string]string
 
@@ -53,14 +48,14 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		windowHeight: windowHeight,
 		database:     database,
 	}
-	n.parent = newItemTable(n.styles, itemViewColumns, true)
-	n.selector = newItemTable(n.styles, itemViewColumns, true, table.WithFocused(true))
-	n.groupPreview = newItemTable(n.styles, itemViewColumns, true)
-	n.entryPreview = newItemTable(table.Styles{
+	n.parent = newGroupTable(n.styles, itemViewColumns, true)
+	n.selector = newGroupTable(n.styles, itemViewColumns, true, table.WithFocused(true))
+	n.groupPreview = newGroupTable(n.styles, itemViewColumns, true)
+	n.entryPreview = newEntryTable(table.Styles{
 		Header:   n.styles.Header.Copy(),
 		Cell:     n.styles.Cell.Copy(),
 		Selected: lipgloss.NewStyle(),
-	}, entryViewColumns, true)
+	})
 
 	n.resizeAll()
 	n.loadLastSelected()
@@ -79,12 +74,12 @@ func (n *Navigate) resizeAll() {
 	selectorWidth := int(float64(n.windowWidth) * 0.3)
 	previewWidth := int(float64(n.windowWidth) * 0.5)
 	parentWidth := n.windowWidth - selectorWidth - previewWidth
-	height := n.windowHeight - 1
+	height := n.windowHeight
 
-	n.parent.SetSize(parentWidth, height)
-	n.selector.SetSize(selectorWidth, height)
-	n.groupPreview.SetSize(previewWidth, height)
-	n.entryPreview.SetSize(previewWidth, height)
+	n.parent.Resize(parentWidth, height)
+	n.selector.Resize(selectorWidth, height)
+	n.groupPreview.Resize(previewWidth, height)
+	n.entryPreview.Resize(previewWidth, height)
 }
 
 func (n *Navigate) updateAll() {
@@ -201,7 +196,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
-		n.resizeAll()
+		//n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {

@@ -9,13 +9,19 @@ import (
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
 	GROUP_PLACEH     = "(No entries)"
 	TITLE_PLACEH     = "(No title)"
 	ENCRYPTED_PLACEH = "******"
+	NUM_COL_WIDTH    = 3
 )
+
+var numberStyle lipgloss.Style = lipgloss.NewStyle().
+	Width(NUM_COL_WIDTH).
+	AlignHorizontal(lipgloss.Right)
 
 type entryField struct {
 	key          string
@@ -29,12 +35,7 @@ var defaultFields []entryField = []entryField{
 	{"Password", "Password", ""},
 }
 
-//type sizedColumn struct {
-//	name  string
-//	width int
-//}
-
-type itemTable struct {
+type groupTable struct {
 	table.Model
 	styles      table.Styles
 	stylesEmpty table.Styles
@@ -43,8 +44,8 @@ type itemTable struct {
 	uuids       []string
 }
 
-func newItemTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) itemTable {
-	return itemTable{
+func newGroupTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) groupTable {
+	return groupTable{
 		Model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
 		stylesEmpty: table.Styles{
@@ -59,63 +60,50 @@ func newItemTable(styles table.Styles, columns []table.Column, sorted bool, opti
 	}
 }
 
-// Set size will set all columns to their given size and additionally scale oone column with width 0 dynamically
+// Resize will set all columns to their given size and additionally scale oone column with width 0 dynamically
 // to fit the width of the table. Don't set the width to 0 for more than one column -- it won't work
-func (t *itemTable) SetSize(width, height int) {
+func (t *groupTable) Resize(width, height int) {
 	t.SetWidth(width)
 	t.SetHeight(height)
-	totalFixed := 0
-	dynamicIndex := -1
-	for i, column := range t.columns {
-		if column.Width == 0 {
-			dynamicIndex = i
-		}
-		totalFixed += column.Width
-	}
+	frameWidth, _ := t.styles.Header.GetFrameSize()
+	numberColWidth := NUM_COL_WIDTH
 
-	newColumns := make([]table.Column, len(t.columns))
-	for i := range newColumns {
-		newColumns[i] = table.Column{
-			Title: t.columns[i].Title,
-		}
-		if i == dynamicIndex {
-			newColumns[i].Width = width - totalFixed - 2*t.styles.Header.GetPaddingLeft() - 2*t.styles.Header.GetPaddingLeft()
-		} else {
-			newColumns[i].Width = t.columns[i].Width
-		}
-	}
-
-	t.SetColumns(newColumns)
+	t.SetColumns([]table.Column{
+		{Title: "Name", Width: width - 2*frameWidth - numberColWidth},
+		{Title: "Val", Width: numberColWidth},
+	})
 }
 
-func (t *itemTable) SetSorted(v bool) {
+func (t *groupTable) SetSorted(v bool) {
 	t.sorted = v
 }
 
-func (t *itemTable) Sorted() bool {
+func (t *groupTable) Sorted() bool {
 	return t.sorted
 }
 
-func (t *itemTable) Clear() {
-	t.SetRows([]table.Row{})
+func (t *groupTable) Clear() {
+	// Must set empty row, in order for truncateHeader to work
+	// Otherwise an empty string would be returned from View(), which messes up the formatting
+	t.SetRows([]table.Row{{"", ""}})
 	t.uuids = []string{}
 }
 
-func (t *itemTable) Init() tea.Cmd {
+func (t *groupTable) Init() tea.Cmd {
 	return nil
 }
 
-func (t itemTable) Update(msg tea.Msg) (itemTable, tea.Cmd) {
+func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
 	var cmd tea.Cmd
 	t.Model, cmd = t.Model.Update(msg)
 	return t, cmd
 }
 
-func (t *itemTable) View() string {
-	return t.Model.View()
+func (t *groupTable) View() string {
+	return truncateHeader(t.Model.View())
 }
 
-func (t *itemTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
+func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
 		t.SetRows([]table.Row{
@@ -131,30 +119,30 @@ func (t *itemTable) Load(d *parser.Document, path []string, lastSelected *map[st
 	t.LoadGroup(group, lastSelected)
 }
 
-func (t *itemTable) LoadGroup(group parser.Group, lastSelected *map[string]string) {
-	if len(group.Groups) == 0 && len(group.Entries) == 0 {
+func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
+	if len(group.Groups)+len(group.Entries) == 0 {
 		t.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
 		t.SetStyles(t.stylesEmpty)
 		t.uuids = []string{}
-	} else {
-		t.SetItems(group.Groups, group.Entries)
-		t.SetStyles(t.styles)
-		t.SetCursor(0)
-		lastSelected, ok := (*lastSelected)[group.UUID]
-		if !ok {
-			return
-		}
-		for i, uuid := range t.uuids {
-			if uuid == lastSelected {
-				t.SetCursor(i)
-			}
+		return
+	}
+	t.SetItems(group.Groups, group.Entries)
+	t.SetStyles(t.styles)
+	t.SetCursor(0)
+	lastCursor, ok := (*lastCursors)[group.UUID]
+	if !ok {
+		return
+	}
+	for i, uuid := range t.uuids {
+		if uuid == lastCursor {
+			t.SetCursor(i)
 		}
 	}
 }
 
-func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
+func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	rows := make([]table.Row, 0, len(groups)+len(entries))
 	t.uuids = make([]string, 0, len(groups)+len(entries))
 	groupsSorted := make([]*parser.Group, 0, len(groups))
@@ -181,7 +169,7 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 		})
 	}
 	for _, group := range groupsSorted {
-		rows = append(rows, table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))})
+		rows = append(rows, table.Row{group.Name, numberStyle.Render(fmt.Sprint(len(group.Groups) + len(group.Entries)))})
 		t.uuids = append(t.uuids, group.UUID)
 	}
 	for _, entry := range entriesSorted {
@@ -192,7 +180,40 @@ func (t *itemTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	t.SetRows(rows)
 }
 
-func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
+func (t *groupTable) FocusedUUID() string {
+	if len(t.uuids) == 0 {
+		return ""
+	}
+	return t.uuids[t.Cursor()]
+}
+
+type entryTable struct {
+	table.Model
+	styles table.Styles
+}
+
+func newEntryTable(styles table.Styles, options ...table.Option) entryTable {
+	return entryTable{
+		Model:  table.New(append(options, table.WithStyles(styles))...),
+		styles: styles,
+	}
+}
+
+func (t *entryTable) Resize(width, height int) {
+	t.SetWidth(width)
+	t.SetHeight(height)
+	frameWidth, _ := t.styles.Header.GetFrameSize()
+	firstColWidth := (width - frameWidth) * 4 / 10
+	secondColWidth := width - firstColWidth - 2*frameWidth
+	newColumns := []table.Column{
+		{Title: "Key", Width: firstColWidth},
+		{Title: "Value", Width: secondColWidth},
+	}
+
+	t.SetColumns(newColumns)
+}
+
+func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	rows := make([]table.Row, 0, len(entry.Strings))
 	visited := make(map[string]struct{})
 	var value string
@@ -220,12 +241,18 @@ func (t *itemTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		rows = append(rows, table.Row{field.Key, value})
 	}
 	t.SetRows(rows)
-	t.uuids = []string{}
 }
 
-func (t *itemTable) FocusedUUID() string {
-	if len(t.uuids) == 0 {
-		return ""
+func (t entryTable) View() string {
+	return truncateHeader(t.Model.View())
+}
+
+// truncateHeader removes the header of a bubbles.Table by
+// deleting everything up to (and including) the first newline
+func truncateHeader(s string) string {
+	split := strings.SplitN(s, "\n", 2)
+	if len(split) < 2 {
+		return split[0]
 	}
-	return t.uuids[t.Cursor()]
+	return split[1]
 }
