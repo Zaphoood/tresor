@@ -9,13 +9,19 @@ import (
 	"github.com/Zaphoood/tresor/lib/keepass/parser"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
 	GROUP_PLACEH     = "(No entries)"
 	TITLE_PLACEH     = "(No title)"
 	ENCRYPTED_PLACEH = "******"
+	NUM_COL_WIDTH    = 3
 )
+
+var numberStyle lipgloss.Style = lipgloss.NewStyle().
+	Width(NUM_COL_WIDTH).
+	AlignHorizontal(lipgloss.Right)
 
 type entryField struct {
 	key          string
@@ -60,7 +66,7 @@ func (t *groupTable) Resize(width, height int) {
 	t.SetWidth(width)
 	t.SetHeight(height)
 	frameWidth, _ := t.styles.Header.GetFrameSize()
-	numberColWidth := 3
+	numberColWidth := NUM_COL_WIDTH
 
 	t.SetColumns([]table.Column{
 		{Title: "Name", Width: width - 2*frameWidth - numberColWidth},
@@ -114,7 +120,7 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 }
 
 func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
-	if len(group.Groups) + len(group.Entries) == 0 {
+	if len(group.Groups)+len(group.Entries) == 0 {
 		t.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
@@ -163,7 +169,7 @@ func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 		})
 	}
 	for _, group := range groupsSorted {
-		rows = append(rows, table.Row{group.Name, fmt.Sprint(len(group.Groups) + len(group.Entries))})
+		rows = append(rows, table.Row{group.Name, numberStyle.Render(fmt.Sprint(len(group.Groups) + len(group.Entries)))})
 		t.uuids = append(t.uuids, group.UUID)
 	}
 	for _, entry := range entriesSorted {
