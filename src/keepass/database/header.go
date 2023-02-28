@@ -11,7 +11,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Zaphoood/tresor/lib/keepass/util"
+	"github.com/Zaphoood/tresor/src/keepass/util"
 )
 
 const (

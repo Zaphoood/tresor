@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Zaphoood/tresor/lib/keepass/crypto"
+	"github.com/Zaphoood/tresor/src/keepass/crypto"
 	"github.com/stretchr/testify/assert"
 )
 

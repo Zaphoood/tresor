@@ -3,7 +3,7 @@ package tui
 import (
 	"log"
 
-	database "github.com/Zaphoood/tresor/lib/keepass/database"
+	database "github.com/Zaphoood/tresor/src/keepass/database"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

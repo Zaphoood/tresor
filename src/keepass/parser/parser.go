@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Zaphoood/tresor/lib/keepass/crypto"
-	"github.com/Zaphoood/tresor/lib/keepass/parser/wrappers"
+	"github.com/Zaphoood/tresor/src/keepass/crypto"
+	"github.com/Zaphoood/tresor/src/keepass/parser/wrappers"
 )
 
 type Document struct {

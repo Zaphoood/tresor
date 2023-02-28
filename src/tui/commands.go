@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Zaphoood/tresor/lib/keepass/crypto"
-	database "github.com/Zaphoood/tresor/lib/keepass/database"
+	"github.com/Zaphoood/tresor/src/keepass/crypto"
+	"github.com/Zaphoood/tresor/src/keepass/database"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

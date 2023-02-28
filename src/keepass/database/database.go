@@ -12,9 +12,9 @@ import (
 	"math"
 	"os"
 
-	"github.com/Zaphoood/tresor/lib/keepass/crypto"
-	"github.com/Zaphoood/tresor/lib/keepass/parser"
-	"github.com/Zaphoood/tresor/lib/keepass/util"
+	"github.com/Zaphoood/tresor/src/keepass/crypto"
+	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/keepass/util"
 )
 
 const (

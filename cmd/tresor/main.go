@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Zaphoood/tresor/lib/keepass/database"
-	"github.com/Zaphoood/tresor/pkg/tui"
-	"github.com/Zaphoood/tresor/pkg/util"
+	"github.com/Zaphoood/tresor/src/keepass/database"
+	"github.com/Zaphoood/tresor/src/tui"
+	"github.com/Zaphoood/tresor/src/util"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

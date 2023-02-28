@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/Zaphoood/tresor/lib/keepass/crypto"
+	"github.com/Zaphoood/tresor/src/keepass/crypto"
 )
 
 var stream crypto.Stream
