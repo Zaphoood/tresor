@@ -78,7 +78,7 @@ type decryptFailedMsg struct {
 
 // saveToPath saves a given database to a given path. An empty path means
 // the database is saved to its original path.
-func saveToPathCmd(d *database.Database, path string) tea.Cmd {
+func saveToPathCmd(d *database.Database, path string, andThen tea.Cmd) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		if len(path) == 0 {
@@ -88,7 +88,7 @@ func saveToPathCmd(d *database.Database, path string) tea.Cmd {
 			err = d.SaveToPath(path)
 		}
 		if err == nil {
-			return saveDoneMsg{path}
+			return saveDoneMsg{path, andThen}
 		} else {
 			return saveFailedMsg{err}
 		}
@@ -97,6 +97,8 @@ func saveToPathCmd(d *database.Database, path string) tea.Cmd {
 
 type saveDoneMsg struct {
 	path string
+	// Should be executed after saving
+	andThen tea.Cmd
 }
 
 type saveFailedMsg struct {
@@ -115,6 +117,8 @@ func scheduleClearClipboard(delay int, notify <-chan struct{}) tea.Cmd {
 }
 
 type clearClipboardMsg struct{}
+
+type clearClipboardAndQuitMsg struct{}
 
 /* When any model receives a tea.WindowSizeMsg, it should emit this command
 in order to alert the main model of the resize. The main model will store the new

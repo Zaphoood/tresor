@@ -187,22 +187,38 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, bool, string) {
 	switch cmd[0] {
 	case "q":
-		if len(cmd) > 1 && len(cmd[1]) > 1 {
-			return nil, true, "Error: Too many arguments"
-		}
-		clearClipboard()
-		return tea.Quit, true, "Bye-bye!"
+		return n.handleQuitCmd(cmd)
 	case "w":
-		if len(cmd) == 1 {
-			return saveToPathCmd(n.database, ""), true, "Saving..."
-		} else if len(cmd) == 2 {
-			return saveToPathCmd(n.database, cmd[1]), true, "Saving..."
-		} else {
-			return nil, true, "Error: Too many arguments"
-		}
+		return n.handleSaveCmd(cmd, false)
+	case "wq", "x":
+		return n.handleSaveCmd(cmd, true)
 	default:
 		return nil, true, fmt.Sprintf("Not a command: %s", cmd)
 	}
+}
+
+func (n *Navigate) handleQuitCmd(cmd []string) (tea.Cmd, bool, string) {
+	if len(cmd) > 1 && len(cmd[1]) > 1 {
+		return nil, true, "Error: Too many arguments"
+	}
+	return func() tea.Msg { return clearClipboardAndQuitMsg{} }, true, "Bye-bye!"
+}
+
+func (n *Navigate) handleSaveCmd(cmd []string, quit bool) (tea.Cmd, bool, string) {
+	if len(cmd) > 2 {
+		return nil, true, "Error: Too many arguments"
+	}
+
+	var andThen tea.Cmd
+	if quit {
+		andThen = func() tea.Msg { return clearClipboardAndQuitMsg{} }
+	}
+	path := ""
+	if len(cmd) == 2 {
+		path = cmd[1]
+	}
+
+	return saveToPathCmd(n.database, path, andThen), true, "Saving..."
 }
 
 func clearClipboard() {
@@ -219,8 +235,12 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case clearClipboardMsg:
 		clearClipboard()
+	case clearClipboardAndQuitMsg:
+		clearClipboard()
+		return n, tea.Quit
 	case saveDoneMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Saved to %s", msg.path))
+		cmds = append(cmds, msg.andThen)
 	case saveFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
 	case tea.WindowSizeMsg:
