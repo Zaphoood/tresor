@@ -195,6 +195,8 @@ func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, string) {
 		return n.handleSaveCmd(cmd, false)
 	case "wq", "x":
 		return n.handleSaveCmd(cmd, true)
+	case "e":
+		return n.handleEditCmd(cmd)
 	default:
 		return nil, fmt.Sprintf("Not a command: %s", cmd[0])
 	}
@@ -224,6 +226,17 @@ func (n *Navigate) handleSaveCmd(cmd []string, quit bool) (tea.Cmd, string) {
 	return saveToPathCmd(n.database, path, andThen), "Saving..."
 }
 
+func (n *Navigate) handleEditCmd(cmd []string) (tea.Cmd, string) {
+	if len(cmd) > 2 {
+		return nil, "Error: Too many arguments"
+	}
+	path := n.database.Path()
+	if len(cmd) == 2 {
+		path = cmd[1]
+	}
+	return fileSelectedCmd(path), "Reloading..."
+}
+
 func clearClipboard() {
 	clipboard.Write(clipboard.FmtText, []byte(""))
 }
@@ -246,6 +259,8 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, msg.andThen)
 	case saveFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
+	case loadFailedMsg:
+		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
