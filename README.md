@@ -1,6 +1,6 @@
 # Tresor 🗝️
 
-A [KeePass](https://www.google.com/search?channel=fs&client=ubuntu&q=keepass) TUI written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Bubbles](https://github.com/charmbracelet/bubbles), featuring a [ranger](https://github.com/ranger/ranger)-inspired layout and vi-like keybindings.
+A [KeePass](https://keepass.info/) TUI written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Bubbles](https://github.com/charmbracelet/bubbles), featuring a [ranger](https://github.com/ranger/ranger)-inspired layout and vi-like keybindings.
 
 <p align="center">
   <br>
@@ -27,18 +27,31 @@ This will save the executable to the working directory.
 
 ## Usage
 
-To open a file, run `tresor FILE`. Alternatively, run just `tresor` and input the filename when prompted.
+To open a file, run `tresor <file>`. Alternatively, run just `tresor` and input the filename when prompted.
 
 After inputting your password, the KeePass database should open.
-Navigate using the <kbd>H</kbd>, <kbd>J</kbd>, <kbd>K</kbd> and <kbd>L</kbd> keys, press <kbd>Ctrl-C</kbd> to exit.
+Navigate using the <kbd>H</kbd>, <kbd>J</kbd>, <kbd>K</kbd> and <kbd>L</kbd> keys, type `:q<Enter>` to exit.
 
 When hovering over an entry, press <kbd>Enter</kbd> to copy its password to the system clipboard. The clipboard will be cleared automatically after ten seconds.
+
+Commands work just like in vim: To execute a command, type `:` followed by the command and press <kbd>Enter</kbd>.
+These commands are currently available:
+
+|Command    |Action                                                                 |
+|-----------|-----------------------------------------------------------------------|
+|`:q`       |Quit without saving                                                    |
+|`:w`       |Save file. Specify path with `:w <file>`                               |
+|`:wq`, `:x`|Save file and quit. Specifying the path works analogous to `:w`        |
+|`:e`       |Reload current file (You will be prompted to enter your password again)|
+|`:e <file>`|Load `<file>` from disk                                                |
+
+Note that currently, the `:w` command is useless, since it's not possible to make changes to a file.
 
 ## Roadmap
 
 This project is at a very early stage. Here is the short list of what is possible right now:
 
- * Open and close `.kdbx` files of version 3.1
+ * Load and save `.kdbx` files of version 3.1
  * Navigate groups and entries
  * Preview entries
  * Copy passwords to clipboard

@@ -30,7 +30,10 @@ type MainModel struct {
 }
 
 func NewMainModel(d *database.Database) MainModel {
-	return MainModel{view: selectFileView, selectFile: NewSelectFile(), database: d}
+	return MainModel{view: selectFileView,
+		selectFile: NewSelectFile(),
+		database:   d,
+	}
 }
 
 func (m MainModel) Init() tea.Cmd {
