@@ -186,6 +186,8 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 
 func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, string) {
 	switch cmd[0] {
+	case "":
+		return nil, ""
 	case "q":
 		return n.handleQuitCmd(cmd)
 	case "w":
@@ -193,7 +195,7 @@ func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, string) {
 	case "wq", "x":
 		return n.handleSaveCmd(cmd, true)
 	default:
-		return nil, fmt.Sprintf("Not a command: %s", cmd)
+		return nil, fmt.Sprintf("Not a command: %s", cmd[0])
 	}
 }
 
