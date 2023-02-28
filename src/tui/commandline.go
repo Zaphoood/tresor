@@ -14,12 +14,13 @@ type CommandLine struct {
 	input     textinput.Model
 	inputMode bool
 	message   string
-	// callback is called after a command is entered. If the bool returned by the function
-	// is true, then the string return value will be set as the new status message
-	callback func([]string) (tea.Cmd, bool, string)
+	// callback is called after a command is entered.
+	// The command returned will be returned from the Update() function and handled by bubbletea,
+	// the string returned will be set as the new status message
+	callback func([]string) (tea.Cmd, string)
 }
 
-func NewCommandLine(callback func([]string) (tea.Cmd, bool, string)) CommandLine {
+func NewCommandLine(callback func([]string) (tea.Cmd, string)) CommandLine {
 	input := textinput.New()
 	input.Prompt = ""
 	return CommandLine{
@@ -87,10 +88,8 @@ func (c *CommandLine) onCommandInput() tea.Cmd {
 		// TODO: Consider displaying error message here
 		return nil
 	}
-	cmd, updateMessage, message := c.callback(cmdAsStrings)
-	if updateMessage {
-		c.message = message
-	}
+	var cmd tea.Cmd
+	cmd, c.message = c.callback(cmdAsStrings)
 	return cmd
 }
 
