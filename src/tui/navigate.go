@@ -188,15 +188,18 @@ func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, bool, string) {
 	switch cmd[0] {
 	case "q":
 		if len(cmd) > 1 && len(cmd[1]) > 1 {
-			return nil, true, "Too many arguments"
+			return nil, true, "Error: Too many arguments"
 		}
 		clearClipboard()
 		return tea.Quit, true, "Bye-bye!"
 	case "w":
-		if len(cmd) > 1 && len(cmd[1]) > 1 {
-			return nil, true, "Too many arguments"
+		if len(cmd) == 1 {
+			return saveToPathCmd(n.database, ""), true, "Saving..."
+		} else if len(cmd) == 2 {
+			return saveToPathCmd(n.database, cmd[1]), true, "Saving..."
+		} else {
+			return nil, true, "Error: Too many arguments"
 		}
-		return saveCmd(n.database), true, "Saving..."
 	default:
 		return nil, true, fmt.Sprintf("Not a command: %s", cmd)
 	}

@@ -76,11 +76,19 @@ type decryptFailedMsg struct {
 	err error
 }
 
-func saveCmd(d *database.Database) tea.Cmd {
+// saveToPath saves a given database to a given path. An empty path means
+// the database is saved to its original path.
+func saveToPathCmd(d *database.Database, path string) tea.Cmd {
 	return func() tea.Msg {
-		err := d.Save()
+		var err error
+		if len(path) == 0 {
+			err = d.Save()
+			path = d.Path()
+		} else {
+			err = d.SaveToPath(path)
+		}
 		if err == nil {
-			return saveDoneMsg{d.Path()}
+			return saveDoneMsg{path}
 		} else {
 			return saveFailedMsg{err}
 		}
