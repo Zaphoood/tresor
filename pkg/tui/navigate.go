@@ -21,11 +21,6 @@ var itemViewColumns []table.Column = []table.Column{
 	{Title: "Entries", Width: 7},
 }
 
-var entryViewColumns []table.Column = []table.Column{
-	{Title: "Key", Width: 40},
-	{Title: "Value", Width: 0},
-}
-
 type Navigate struct {
 	parent       groupTable
 	selector     groupTable
@@ -60,7 +55,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		Header:   n.styles.Header.Copy(),
 		Cell:     n.styles.Cell.Copy(),
 		Selected: lipgloss.NewStyle(),
-	}, entryViewColumns)
+	})
 
 	n.resizeAll()
 	n.loadLastSelected()
@@ -201,7 +196,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
-		n.resizeAll()
+		//n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {

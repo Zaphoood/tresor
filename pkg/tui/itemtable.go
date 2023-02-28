@@ -59,28 +59,13 @@ func newGroupTable(styles table.Styles, columns []table.Column, sorted bool, opt
 func (t *groupTable) Resize(width, height int) {
 	t.SetWidth(width)
 	t.SetHeight(height)
-	totalFixed := 0
-	dynamicIndex := -1
-	for i, column := range t.columns {
-		if column.Width == 0 {
-			dynamicIndex = i
-		}
-		totalFixed += column.Width
-	}
+	frameWidth, _ := t.styles.Header.GetFrameSize()
+	numberColWidth := 3
 
-	newColumns := make([]table.Column, len(t.columns))
-	for i := range newColumns {
-		newColumns[i] = table.Column{
-			Title: t.columns[i].Title,
-		}
-		if i == dynamicIndex {
-			newColumns[i].Width = width - totalFixed - 2*t.styles.Header.GetPaddingLeft() - 2*t.styles.Header.GetPaddingLeft()
-		} else {
-			newColumns[i].Width = t.columns[i].Width
-		}
-	}
-
-	t.SetColumns(newColumns)
+	t.SetColumns([]table.Column{
+		{Title: "Name", Width: width - 2*frameWidth - numberColWidth},
+		{Title: "Val", Width: numberColWidth},
+	})
 }
 
 func (t *groupTable) SetSorted(v bool) {
@@ -198,40 +183,25 @@ func (t *groupTable) FocusedUUID() string {
 
 type entryTable struct {
 	table.Model
-	styles  table.Styles
-	columns []table.Column
+	styles table.Styles
 }
 
-func newEntryTable(styles table.Styles, columns []table.Column, options ...table.Option) entryTable {
+func newEntryTable(styles table.Styles, options ...table.Option) entryTable {
 	return entryTable{
-		Model:   table.New(append(options, table.WithStyles(styles))...),
-		styles:  styles,
-		columns: columns,
+		Model:  table.New(append(options, table.WithStyles(styles))...),
+		styles: styles,
 	}
 }
 
 func (t *entryTable) Resize(width, height int) {
 	t.SetWidth(width)
 	t.SetHeight(height)
-	totalFixed := 0
-	dynamicIndex := -1
-	for i, column := range t.columns {
-		if column.Width == 0 {
-			dynamicIndex = i
-		}
-		totalFixed += column.Width
-	}
-
-	newColumns := make([]table.Column, len(t.columns))
-	for i := range newColumns {
-		newColumns[i] = table.Column{
-			Title: t.columns[i].Title,
-		}
-		if i == dynamicIndex {
-			newColumns[i].Width = width - totalFixed - 2*t.styles.Header.GetPaddingLeft() - 2*t.styles.Header.GetPaddingLeft()
-		} else {
-			newColumns[i].Width = t.columns[i].Width
-		}
+	frameWidth, _ := t.styles.Header.GetFrameSize()
+	firstColWidth := (width - frameWidth) * 4 / 10
+	secondColWidth := width - firstColWidth - 2*frameWidth
+	newColumns := []table.Column{
+		{Title: "Key", Width: firstColWidth},
+		{Title: "Value", Width: secondColWidth},
 	}
 
 	t.SetColumns(newColumns)
@@ -265,6 +235,10 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		rows = append(rows, table.Row{field.Key, value})
 	}
 	t.SetRows(rows)
+}
+
+func (t entryTable) View() string {
+	return truncateHeader(t.Model.View())
 }
 
 // truncateHeader removes the header of a bubbles.Table by
