@@ -41,7 +41,10 @@ type groupTable struct {
 	stylesEmpty table.Styles
 	columns     []table.Column
 	sorted      bool
-	uuids       []string
+	// TODO: Instead of storing a separate list of UUIDs, store a list
+	// of shallow copies of Items (includes only metadata like title etc.
+	// but not supgroups, child entries or history)
+	uuids []string
 }
 
 func newGroupTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) groupTable {

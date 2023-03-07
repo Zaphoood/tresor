@@ -241,6 +241,8 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 }
 
 func (n *Navigate) handleSearch(query string) tea.Cmd {
+	// TODO: groupTable should have search function which searches thrugh
+	// the titles of its items (group.Name, entry.Strings["Title"])
 	n.cmdLine.SetMessage(fmt.Sprintf("[Navigate] You searched for '%s'", query))
 	return nil
 }
