@@ -32,6 +32,9 @@ type Navigate struct {
 	lastCursor   map[string]string
 	cmdLine      CommandLine
 
+	search      []string
+	searchIndex int
+
 	path []string
 	err  error
 
@@ -93,6 +96,8 @@ func (n *Navigate) updateAll() {
 		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], &n.lastCursor)
 	}
 	n.selector.Load(n.database.Parsed(), n.path, &n.lastCursor)
+	// Reset search results
+	n.search = []string{}
 	n.updatePreview()
 }
 
@@ -242,17 +247,38 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 }
 
 func (n *Navigate) handleSearch(query string) tea.Cmd {
-	matchedUUIDs := n.selector.FindAll(func(item parser.Item) bool {
+	n.search = n.selector.FindAll(func(item parser.Item) bool {
 		switch item := item.(type) {
 		case parser.Group:
-			return strings.Contains(item.Name, query)
+			return strings.Contains(strings.ToLower(item.Name), strings.ToLower(query))
 		case parser.Entry:
-			return strings.Contains(item.TryGet("Title", ""), query)
+			return strings.Contains(strings.ToLower(item.TryGet("Title", "")), strings.ToLower(query))
 		}
 		return false
 	})
-	n.cmdLine.SetMessage(fmt.Sprintf("Found UUIDs: %v", matchedUUIDs))
+	if len(n.search) == 0 {
+		n.cmdLine.SetMessage(fmt.Sprintf("Not found: %s", query))
+	} else {
+		n.searchIndex = 0
+		n.selector.SetFocusToUUID(n.search[0])
+	}
 	return nil
+}
+
+func (n *Navigate) nextSearchResult() {
+	if len(n.search) == 0 {
+		return
+	}
+	n.searchIndex = (n.searchIndex + 1) % len(n.search)
+	n.selector.SetFocusToUUID(n.search[n.searchIndex])
+}
+
+func (n *Navigate) previousSearchResult() {
+	if len(n.search) == 0 {
+		return
+	}
+	n.searchIndex = (n.searchIndex + len(n.search) - 1) % len(n.search)
+	n.selector.SetFocusToUUID(n.search[n.searchIndex])
 }
 
 func clearClipboard() {
@@ -300,6 +326,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				n.moveRight()
 			case "h":
 				n.moveLeft()
+			case "n":
+				n.nextSearchResult()
+			case "N":
+				n.previousSearchResult()
 			}
 		}
 		n.cmdLine, cmd = n.cmdLine.Update(msg)

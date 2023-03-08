@@ -199,6 +199,18 @@ func (t *groupTable) FocusedUUID() string {
 	return t.items[t.Cursor()].GetUUID()
 }
 
+func (t *groupTable) SetFocusToUUID(uuid string) error {
+	if len(t.items) == 0 {
+		return fmt.Errorf("Failed set cursor to UUID %s: Group is empty", uuid)
+	}
+	for i, item := range t.items {
+		if uuid == item.GetUUID() {
+			t.SetCursor(i)
+		}
+	}
+	return fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
+}
+
 type entryTable struct {
 	table.Model
 	styles table.Styles
