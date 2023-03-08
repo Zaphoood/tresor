@@ -61,7 +61,8 @@ This project is at a very early stage. Here is the short list of what is possibl
 
 Some features planned for the future are:
 
- * Searching through and editing entries
+ * Editing entries
+ * Fuzzy-finding
  * Creating new databases
  * Customization via config file (inculding color scheme)
  * Kdbx version 4 support
