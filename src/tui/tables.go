@@ -182,6 +182,16 @@ func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	t.SetRows(rows)
 }
 
+func (t *groupTable) FindAll(predicate func(parser.Item) bool) []string {
+	uuids := make([]string, 0)
+	for _, item := range t.items {
+		if predicate(item) {
+			uuids = append(uuids, item.GetUUID())
+		}
+	}
+	return uuids
+}
+
 func (t *groupTable) FocusedUUID() string {
 	if len(t.items) == 0 {
 		return ""
