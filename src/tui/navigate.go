@@ -319,7 +319,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "ctrl+c":
 				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
-			case "enter":
+			case "y":
 				cmd := n.copyToClipboard()
 				return n, cmd
 			case "l":
