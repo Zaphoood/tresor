@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
@@ -241,9 +242,16 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 }
 
 func (n *Navigate) handleSearch(query string) tea.Cmd {
-	// TODO: groupTable should have search function which searches thrugh
-	// the titles of its items (group.Name, entry.Strings["Title"])
-	n.cmdLine.SetMessage(fmt.Sprintf("[Navigate] You searched for '%s'", query))
+	matchedUUIDs := n.selector.FindAll(func(item parser.Item) bool {
+		switch item := item.(type) {
+		case parser.Group:
+			return strings.Contains(item.Name, query)
+		case parser.Entry:
+			return strings.Contains(item.TryGet("Title", ""), query)
+		}
+		return false
+	})
+	n.cmdLine.SetMessage(fmt.Sprintf("Found UUIDs: %v", matchedUUIDs))
 	return nil
 }
 
