@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
@@ -31,6 +32,9 @@ type Navigate struct {
 	lastCursor   map[string]string
 	cmdLine      CommandLine
 
+	search      []string
+	searchIndex int
+
 	path []string
 	err  error
 
@@ -50,7 +54,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		windowHeight: windowHeight,
 		database:     database,
 	}
-	n.cmdLine = NewCommandLine(n.handleCommand)
+	n.cmdLine = NewCommandLine()
 	n.parent = newGroupTable(n.styles, itemViewColumns, true)
 	n.selector = newGroupTable(n.styles, itemViewColumns, true, table.WithFocused(true))
 	n.groupPreview = newGroupTable(n.styles, itemViewColumns, true)
@@ -92,6 +96,8 @@ func (n *Navigate) updateAll() {
 		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], &n.lastCursor)
 	}
 	n.selector.Load(n.database.Parsed(), n.path, &n.lastCursor)
+	// Reset search results
+	n.search = []string{}
 	n.updatePreview()
 }
 
@@ -125,10 +131,8 @@ func (n *Navigate) updatePreview() {
 	}
 	switch item := item.(type) {
 	case parser.Group:
-		// A group is focused
 		n.groupPreview.LoadGroup(item, &n.lastCursor)
 	case parser.Entry:
-		// An entry is focused
 		n.entryPreview.LoadEntry(item, n.database)
 	default:
 		log.Printf("ERROR in updatePreview: Expected Group or Entry from GetItem()")
@@ -184,9 +188,9 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChange)
 }
 
-func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, string) {
+func (n *Navigate) handleCommand(cmd []string) tea.Cmd {
 	if len(cmd) == 0 {
-		return nil, ""
+		return nil
 	}
 	switch cmd[0] {
 	case "q":
@@ -198,20 +202,23 @@ func (n *Navigate) handleCommand(cmd []string) (tea.Cmd, string) {
 	case "e":
 		return n.handleEditCmd(cmd)
 	default:
-		return nil, fmt.Sprintf("Not a command: %s", cmd[0])
+		n.cmdLine.SetMessage(fmt.Sprintf("Not a command: %s", cmd[0]))
+		return nil
 	}
 }
 
-func (n *Navigate) handleQuitCmd(cmd []string) (tea.Cmd, string) {
+func (n *Navigate) handleQuitCmd(cmd []string) tea.Cmd {
 	if len(cmd) > 1 && len(cmd[1]) > 1 {
-		return nil, "Error: Too many arguments"
+		n.cmdLine.SetMessage("Error: Too many arguments")
+		return nil
 	}
-	return func() tea.Msg { return clearClipboardAndQuitMsg{} }, "Bye-bye!"
+	return func() tea.Msg { return clearClipboardAndQuitMsg{} }
 }
 
-func (n *Navigate) handleSaveCmd(cmd []string, quit bool) (tea.Cmd, string) {
+func (n *Navigate) handleSaveCmd(cmd []string, quit bool) tea.Cmd {
 	if len(cmd) > 2 {
-		return nil, "Error: Too many arguments"
+		n.cmdLine.SetMessage("Error: Too many arguments")
+		return nil
 	}
 
 	var andThen tea.Cmd
@@ -222,19 +229,56 @@ func (n *Navigate) handleSaveCmd(cmd []string, quit bool) (tea.Cmd, string) {
 	if len(cmd) == 2 {
 		path = cmd[1]
 	}
-
-	return saveToPathCmd(n.database, path, andThen), "Saving..."
+	n.cmdLine.SetMessage("Saving...")
+	return saveToPathCmd(n.database, path, andThen)
 }
 
-func (n *Navigate) handleEditCmd(cmd []string) (tea.Cmd, string) {
+func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 	if len(cmd) > 2 {
-		return nil, "Error: Too many arguments"
+		n.cmdLine.SetMessage("Error: Too many arguments")
+		return nil
 	}
 	path := n.database.Path()
 	if len(cmd) == 2 {
 		path = cmd[1]
 	}
-	return fileSelectedCmd(path), "Reloading..."
+	n.cmdLine.SetMessage("Reloading...")
+	return fileSelectedCmd(path)
+}
+
+func (n *Navigate) handleSearch(query string) tea.Cmd {
+	n.search = n.selector.FindAll(func(item parser.Item) bool {
+		switch item := item.(type) {
+		case parser.Group:
+			return strings.Contains(strings.ToLower(item.Name), strings.ToLower(query))
+		case parser.Entry:
+			return strings.Contains(strings.ToLower(item.TryGet("Title", "")), strings.ToLower(query))
+		}
+		return false
+	})
+	if len(n.search) == 0 {
+		n.cmdLine.SetMessage(fmt.Sprintf("Not found: %s", query))
+	} else {
+		n.searchIndex = 0
+		n.selector.SetFocusToUUID(n.search[0])
+	}
+	return nil
+}
+
+func (n *Navigate) nextSearchResult() {
+	if len(n.search) == 0 {
+		return
+	}
+	n.searchIndex = (n.searchIndex + 1) % len(n.search)
+	n.selector.SetFocusToUUID(n.search[n.searchIndex])
+}
+
+func (n *Navigate) previousSearchResult() {
+	if len(n.search) == 0 {
+		return
+	}
+	n.searchIndex = (n.searchIndex + len(n.search) - 1) % len(n.search)
+	n.selector.SetFocusToUUID(n.search[n.searchIndex])
 }
 
 func clearClipboard() {
@@ -254,6 +298,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clearClipboardAndQuitMsg:
 		clearClipboard()
 		return n, tea.Quit
+	case commandInputMsg:
+		cmds = append(cmds, n.handleCommand(msg.cmd))
+	case searchInputMsg:
+		cmds = append(cmds, n.handleSearch(msg.query))
 	case saveDoneMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Saved to %s", msg.path))
 		cmds = append(cmds, msg.andThen)
@@ -267,7 +315,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		if !n.cmdLine.IsInputMode() {
+		if !n.cmdLine.IsInputActive() {
 			switch msg.String() {
 			case "ctrl+c":
 				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
@@ -278,12 +326,16 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				n.moveRight()
 			case "h":
 				n.moveLeft()
+			case "n":
+				n.nextSearchResult()
+			case "N":
+				n.previousSearchResult()
 			}
 		}
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		cmds = append(cmds, cmd)
 	}
-	if !n.cmdLine.IsInputMode() {
+	if !n.cmdLine.IsInputActive() {
 		cursor := n.selector.Cursor()
 		n.selector, cmd = n.selector.Update(msg)
 		if cursor != n.selector.Cursor() {

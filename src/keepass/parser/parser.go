@@ -80,7 +80,11 @@ type DeletedObject struct {
 	DeletionTime time.Time
 }
 
-type Item interface{}
+type Item interface {
+	GetUUID() string
+	// Performs a 'shallow copy', only copying metadata such as name, UUID, etc. but not subgroups, entries, history etc.
+	CopyMeta() Item
+}
 
 type Group struct {
 	XMLName xml.Name `xml:"Group"`
@@ -98,6 +102,17 @@ type Group struct {
 
 	Entries []Entry `xml:"Entry"`
 	Groups  []Group `xml:"Group"`
+}
+
+func (g Group) GetUUID() string {
+	return g.UUID
+}
+
+func (g Group) CopyMeta() Item {
+	gCopy := g
+	gCopy.Entries = nil
+	gCopy.Groups = nil
+	return gCopy
 }
 
 func (g *Group) Get(uuid string) (Item, error) {
@@ -129,6 +144,16 @@ type Entry struct {
 	AutoType        AutoType
 	// History must be pointer to slice in order for omitempty to work for nested elements
 	History *[]Entry `xml:"History>Entry,omitempty"`
+}
+
+func (e Entry) GetUUID() string {
+	return e.UUID
+}
+
+func (e Entry) CopyMeta() Item {
+	e_ := e
+	e_.History = nil
+	return e_
 }
 
 type Times struct {

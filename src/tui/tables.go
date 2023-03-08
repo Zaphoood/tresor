@@ -41,7 +41,9 @@ type groupTable struct {
 	stylesEmpty table.Styles
 	columns     []table.Column
 	sorted      bool
-	uuids       []string
+	// items is a list of copies of the database items currently being displayed; only metadata is copied,
+	// not sub-items
+	items []parser.Item
 }
 
 func newGroupTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) groupTable {
@@ -86,7 +88,7 @@ func (t *groupTable) Clear() {
 	// Must set empty row, in order for truncateHeader to work
 	// Otherwise an empty string would be returned from View(), which messes up the formatting
 	t.SetRows([]table.Row{{"", ""}})
-	t.uuids = []string{}
+	t.items = []parser.Item{}
 }
 
 func (t *groupTable) Init() tea.Cmd {
@@ -109,7 +111,7 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 		t.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
-		t.uuids = []string{}
+		t.items = []parser.Item{}
 	}
 	group, ok := item.(parser.Group)
 	if !ok {
@@ -125,7 +127,7 @@ func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]strin
 			{GROUP_PLACEH, ""},
 		})
 		t.SetStyles(t.stylesEmpty)
-		t.uuids = []string{}
+		t.items = []parser.Item{}
 		return
 	}
 	t.SetItems(group.Groups, group.Entries)
@@ -135,8 +137,8 @@ func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]strin
 	if !ok {
 		return
 	}
-	for i, uuid := range t.uuids {
-		if uuid == lastCursor {
+	for i, item := range t.items {
+		if item.GetUUID() == lastCursor {
 			t.SetCursor(i)
 		}
 	}
@@ -144,7 +146,7 @@ func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]strin
 
 func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	rows := make([]table.Row, 0, len(groups)+len(entries))
-	t.uuids = make([]string, 0, len(groups)+len(entries))
+	t.items = make([]parser.Item, 0, len(groups)+len(entries))
 	groupsSorted := make([]*parser.Group, 0, len(groups))
 	entriesSorted := make([]*parser.Entry, 0, len(entries))
 	for i := range groups {
@@ -170,21 +172,43 @@ func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 	}
 	for _, group := range groupsSorted {
 		rows = append(rows, table.Row{group.Name, numberStyle.Render(fmt.Sprint(len(group.Groups) + len(group.Entries)))})
-		t.uuids = append(t.uuids, group.UUID)
+		t.items = append(t.items, group.CopyMeta())
 	}
 	for _, entry := range entriesSorted {
 		title := entry.TryGet("Title", TITLE_PLACEH)
 		rows = append(rows, table.Row{title, ""})
-		t.uuids = append(t.uuids, entry.UUID)
+		t.items = append(t.items, entry.CopyMeta())
 	}
 	t.SetRows(rows)
 }
 
+func (t *groupTable) FindAll(predicate func(parser.Item) bool) []string {
+	uuids := make([]string, 0)
+	for _, item := range t.items {
+		if predicate(item) {
+			uuids = append(uuids, item.GetUUID())
+		}
+	}
+	return uuids
+}
+
 func (t *groupTable) FocusedUUID() string {
-	if len(t.uuids) == 0 {
+	if len(t.items) == 0 {
 		return ""
 	}
-	return t.uuids[t.Cursor()]
+	return t.items[t.Cursor()].GetUUID()
+}
+
+func (t *groupTable) SetFocusToUUID(uuid string) error {
+	if len(t.items) == 0 {
+		return fmt.Errorf("Failed set cursor to UUID %s: Group is empty", uuid)
+	}
+	for i, item := range t.items {
+		if uuid == item.GetUUID() {
+			t.SetCursor(i)
+		}
+	}
+	return fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
 }
 
 type entryTable struct {
