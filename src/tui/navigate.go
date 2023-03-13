@@ -18,11 +18,6 @@ import (
 
 const CLEAR_CLIPBOARD_DELAY = 10
 
-var itemViewColumns []table.Column = []table.Column{
-	{Title: "Name", Width: 0},
-	{Title: "Entries", Width: 7},
-}
-
 type Navigate struct {
 	parent       groupTable
 	selector     groupTable
@@ -55,9 +50,9 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		database:     database,
 	}
 	n.cmdLine = NewCommandLine()
-	n.parent = newGroupTable(n.styles, itemViewColumns, true)
-	n.selector = newGroupTable(n.styles, itemViewColumns, true, table.WithFocused(true))
-	n.groupPreview = newGroupTable(n.styles, itemViewColumns, true)
+	n.parent = newGroupTable(n.styles, true)
+	n.selector = newGroupTable(n.styles, true, table.WithFocused(true))
+	n.groupPreview = newGroupTable(n.styles, true)
 	n.entryPreview = newEntryTable(table.Styles{
 		Header:   n.styles.Header.Copy(),
 		Cell:     n.styles.Cell.Copy(),

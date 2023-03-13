@@ -39,14 +39,13 @@ type groupTable struct {
 	table.Model
 	styles      table.Styles
 	stylesEmpty table.Styles
-	columns     []table.Column
 	sorted      bool
-	// items is a list of copies of the database items currently being displayed; only metadata is copied,
-	// not sub-items
+	// items is a list of copies of the database items currently being displayed;
+	// only metadata is copied, not sub-items
 	items []parser.Item
 }
 
-func newGroupTable(styles table.Styles, columns []table.Column, sorted bool, options ...table.Option) groupTable {
+func newGroupTable(styles table.Styles, sorted bool, options ...table.Option) groupTable {
 	return groupTable{
 		Model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
@@ -57,8 +56,7 @@ func newGroupTable(styles table.Styles, columns []table.Column, sorted bool, opt
 				Foreground(styles.Cell.GetForeground()).
 				Bold(false),
 		},
-		columns: columns,
-		sorted:  sorted,
+		sorted: sorted,
 	}
 }
 
