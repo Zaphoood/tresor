@@ -84,6 +84,7 @@ func (t *groupTable) Clear() {
 	// Otherwise an empty string would be returned from View(), which messes up the formatting
 	t.model.SetRows([]table.Row{{"", ""}})
 	t.items = []parser.Item{}
+	t.model.SetStyles(t.stylesEmpty)
 }
 
 func (t *groupTable) Init() tea.Cmd {
@@ -107,10 +108,12 @@ func (t *groupTable) View() string {
 func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
-		t.Clear()
 		t.model.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
+		t.model.SetStyles(t.styles)
+		t.items = []parser.Item{}
+		return
 	}
 	group, ok := item.(parser.Group)
 	if !ok {
@@ -121,16 +124,15 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 }
 
 func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
+	t.model.SetStyles(t.styles)
 	if len(group.Groups)+len(group.Entries) == 0 {
-		t.Clear()
 		t.model.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
-		t.model.SetStyles(t.stylesEmpty)
+		t.items = []parser.Item{}
 		return
 	}
-	t.SetItems(group.Groups, group.Entries)
-	t.model.SetStyles(t.styles)
+	t.LoadItems(group.Groups, group.Entries)
 	lastCursor, ok := (*lastCursors)[group.UUID]
 	if !ok {
 		t.model.SetCursor(0)
@@ -143,7 +145,7 @@ func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]strin
 	}
 }
 
-func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
+func (t *groupTable) LoadItems(groups []parser.Group, entries []parser.Entry) {
 	rows := make([]table.Row, 0, len(groups)+len(entries))
 	t.items = make([]parser.Item, 0, len(groups)+len(entries))
 	groupsSorted := make([]*parser.Group, 0, len(groups))
