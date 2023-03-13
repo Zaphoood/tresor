@@ -133,3 +133,5 @@ type globalResizeMsg struct {
 	width  int
 	height int
 }
+
+type groupTableCursorChanged struct{}

@@ -50,9 +50,9 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		database:     database,
 	}
 	n.cmdLine = NewCommandLine()
-	n.parent = newGroupTable(n.styles, true)
-	n.selector = newGroupTable(n.styles, true, table.WithFocused(true))
-	n.groupPreview = newGroupTable(n.styles, true)
+	n.parent = newGroupTable(n.styles, true, false)
+	n.selector = newGroupTable(n.styles, true, true, table.WithFocused(true))
+	n.groupPreview = newGroupTable(n.styles, true, false)
 	n.entryPreview = newEntryTable(table.Styles{
 		Header:   n.styles.Header.Copy(),
 		Cell:     n.styles.Cell.Copy(),
@@ -293,6 +293,8 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clearClipboardAndQuitMsg:
 		clearClipboard()
 		return n, tea.Quit
+	case groupTableCursorChanged:
+		n.updatePreview()
 	case commandInputMsg:
 		cmds = append(cmds, n.handleCommand(msg.cmd))
 	case searchInputMsg:
@@ -331,11 +333,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 	if !n.cmdLine.IsInputActive() {
-		cursor := n.selector.Cursor()
 		n.selector, cmd = n.selector.Update(msg)
-		if cursor != n.selector.Cursor() {
-			n.updatePreview()
-		}
 		cmds = append(cmds, cmd)
 	}
 

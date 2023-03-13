@@ -36,18 +36,19 @@ var defaultFields []entryField = []entryField{
 }
 
 type groupTable struct {
-	table.Model
-	styles      table.Styles
-	stylesEmpty table.Styles
-	sorted      bool
+	model              table.Model
+	styles             table.Styles
+	stylesEmpty        table.Styles
+	sorted             bool
+	notifyCursorChange bool
 	// items is a list of copies of the database items currently being displayed;
 	// only metadata is copied, not sub-items
 	items []parser.Item
 }
 
-func newGroupTable(styles table.Styles, sorted bool, options ...table.Option) groupTable {
+func newGroupTable(styles table.Styles, sorted bool, notifyCursorChange bool, options ...table.Option) groupTable {
 	return groupTable{
-		Model:  table.New(append(options, table.WithStyles(styles))...),
+		model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
 		stylesEmpty: table.Styles{
 			Header: styles.Header,
@@ -56,19 +57,20 @@ func newGroupTable(styles table.Styles, sorted bool, options ...table.Option) gr
 				Foreground(styles.Cell.GetForeground()).
 				Bold(false),
 		},
-		sorted: sorted,
+		sorted:             sorted,
+		notifyCursorChange: notifyCursorChange,
 	}
 }
 
 // Resize will set all columns to their given size and additionally scale oone column with width 0 dynamically
 // to fit the width of the table. Don't set the width to 0 for more than one column -- it won't work
 func (t *groupTable) Resize(width, height int) {
-	t.SetWidth(width)
-	t.SetHeight(height)
+	t.model.SetWidth(width)
+	t.model.SetHeight(height)
 	frameWidth, _ := t.styles.Header.GetFrameSize()
 	numberColWidth := NUM_COL_WIDTH
 
-	t.SetColumns([]table.Column{
+	t.model.SetColumns([]table.Column{
 		{Title: "Name", Width: width - 2*frameWidth - numberColWidth},
 		{Title: "Val", Width: numberColWidth},
 	})
@@ -85,7 +87,7 @@ func (t *groupTable) Sorted() bool {
 func (t *groupTable) Clear() {
 	// Must set empty row, in order for truncateHeader to work
 	// Otherwise an empty string would be returned from View(), which messes up the formatting
-	t.SetRows([]table.Row{{"", ""}})
+	t.model.SetRows([]table.Row{{"", ""}})
 	t.items = []parser.Item{}
 }
 
@@ -95,18 +97,22 @@ func (t *groupTable) Init() tea.Cmd {
 
 func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
 	var cmd tea.Cmd
-	t.Model, cmd = t.Model.Update(msg)
+	oldCursor := t.model.Cursor()
+	t.model, cmd = t.model.Update(msg)
+	if t.notifyCursorChange && oldCursor != t.model.Cursor() {
+		return t, tea.Batch(cmd, func() tea.Msg { return groupTableCursorChanged{} })
+	}
 	return t, cmd
 }
 
 func (t *groupTable) View() string {
-	return truncateHeader(t.Model.View())
+	return truncateHeader(t.model.View())
 }
 
 func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
-		t.SetRows([]table.Row{
+		t.model.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
 		t.items = []parser.Item{}
@@ -121,23 +127,23 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 
 func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
 	if len(group.Groups)+len(group.Entries) == 0 {
-		t.SetRows([]table.Row{
+		t.model.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
-		t.SetStyles(t.stylesEmpty)
+		t.model.SetStyles(t.stylesEmpty)
 		t.items = []parser.Item{}
 		return
 	}
 	t.SetItems(group.Groups, group.Entries)
-	t.SetStyles(t.styles)
-	t.SetCursor(0)
+	t.model.SetStyles(t.styles)
+	t.model.SetCursor(0)
 	lastCursor, ok := (*lastCursors)[group.UUID]
 	if !ok {
 		return
 	}
 	for i, item := range t.items {
 		if item.GetUUID() == lastCursor {
-			t.SetCursor(i)
+			t.model.SetCursor(i)
 		}
 	}
 }
@@ -177,7 +183,7 @@ func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 		rows = append(rows, table.Row{title, ""})
 		t.items = append(t.items, entry.CopyMeta())
 	}
-	t.SetRows(rows)
+	t.model.SetRows(rows)
 }
 
 func (t *groupTable) FindAll(predicate func(parser.Item) bool) []string {
@@ -194,7 +200,7 @@ func (t *groupTable) FocusedUUID() string {
 	if len(t.items) == 0 {
 		return ""
 	}
-	return t.items[t.Cursor()].GetUUID()
+	return t.items[t.model.Cursor()].GetUUID()
 }
 
 func (t *groupTable) SetFocusToUUID(uuid string) error {
@@ -203,27 +209,27 @@ func (t *groupTable) SetFocusToUUID(uuid string) error {
 	}
 	for i, item := range t.items {
 		if uuid == item.GetUUID() {
-			t.SetCursor(i)
+			t.model.SetCursor(i)
 		}
 	}
 	return fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
 }
 
 type entryTable struct {
-	table.Model
+	model  table.Model
 	styles table.Styles
 }
 
 func newEntryTable(styles table.Styles, options ...table.Option) entryTable {
 	return entryTable{
-		Model:  table.New(append(options, table.WithStyles(styles))...),
+		model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
 	}
 }
 
 func (t *entryTable) Resize(width, height int) {
-	t.SetWidth(width)
-	t.SetHeight(height)
+	t.model.SetWidth(width)
+	t.model.SetHeight(height)
 	frameWidth, _ := t.styles.Header.GetFrameSize()
 	firstColWidth := (width - frameWidth) * 4 / 10
 	secondColWidth := width - firstColWidth - 2*frameWidth
@@ -232,7 +238,7 @@ func (t *entryTable) Resize(width, height int) {
 		{Title: "Value", Width: secondColWidth},
 	}
 
-	t.SetColumns(newColumns)
+	t.model.SetColumns(newColumns)
 }
 
 func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
@@ -262,11 +268,11 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		}
 		rows = append(rows, table.Row{field.Key, value})
 	}
-	t.SetRows(rows)
+	t.model.SetRows(rows)
 }
 
 func (t entryTable) View() string {
-	return truncateHeader(t.Model.View())
+	return truncateHeader(t.model.View())
 }
 
 // truncateHeader removes the header of a bubbles.Table by
