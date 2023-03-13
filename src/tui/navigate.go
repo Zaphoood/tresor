@@ -33,7 +33,6 @@ type Navigate struct {
 	path []string
 	err  error
 
-	styles       table.Styles
 	windowWidth  int
 	windowHeight int
 
@@ -41,8 +40,14 @@ type Navigate struct {
 }
 
 func NewNavigate(database *database.Database, windowWidth, windowHeight int) Navigate {
+	styles := table.Styles{
+		Header: lipgloss.NewStyle().Bold(true),
+		Cell:   lipgloss.NewStyle(),
+		Selected: lipgloss.NewStyle().
+			Reverse(true).
+			Bold(true),
+	}
 	n := Navigate{
-		styles:       table.DefaultStyles(),
 		path:         []string{},
 		lastCursor:   make(map[string]string),
 		windowWidth:  windowWidth,
@@ -50,12 +55,12 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		database:     database,
 	}
 	n.cmdLine = NewCommandLine()
-	n.parent = newGroupTable(n.styles, true, false)
-	n.selector = newGroupTable(n.styles, true, true, table.WithFocused(true))
-	n.groupPreview = newGroupTable(n.styles, true, false)
+	n.parent = newGroupTable(styles, true, false)
+	n.selector = newGroupTable(styles, true, true, table.WithFocused(true))
+	n.groupPreview = newGroupTable(styles, true, false)
 	n.entryPreview = newEntryTable(table.Styles{
-		Header:   n.styles.Header.Copy(),
-		Cell:     n.styles.Cell.Copy(),
+		Header:   styles.Header.Copy(),
+		Cell:     styles.Cell.Copy(),
 		Selected: lipgloss.NewStyle(),
 	})
 

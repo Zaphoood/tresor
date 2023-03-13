@@ -51,11 +51,9 @@ func newGroupTable(styles table.Styles, sorted bool, notifyCursorChange bool, op
 		model:  table.New(append(options, table.WithStyles(styles))...),
 		styles: styles,
 		stylesEmpty: table.Styles{
-			Header: styles.Header,
-			Cell:   styles.Cell,
-			Selected: styles.Selected.Copy().
-				Foreground(styles.Cell.GetForeground()).
-				Bold(false),
+			Header:   styles.Header,
+			Cell:     styles.Cell,
+			Selected: styles.Cell.Copy(),
 		},
 		sorted:             sorted,
 		notifyCursorChange: notifyCursorChange,
