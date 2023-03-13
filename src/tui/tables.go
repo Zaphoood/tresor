@@ -62,17 +62,14 @@ func newGroupTable(styles table.Styles, sorted bool, notifyCursorChange bool, op
 	}
 }
 
-// Resize will set all columns to their given size and additionally scale oone column with width 0 dynamically
-// to fit the width of the table. Don't set the width to 0 for more than one column -- it won't work
 func (t *groupTable) Resize(width, height int) {
 	t.model.SetWidth(width)
 	t.model.SetHeight(height)
 	frameWidth, _ := t.styles.Header.GetFrameSize()
-	numberColWidth := NUM_COL_WIDTH
 
 	t.model.SetColumns([]table.Column{
-		{Title: "Name", Width: width - 2*frameWidth - numberColWidth},
-		{Title: "Val", Width: numberColWidth},
+		{Title: "Name", Width: width - 2*frameWidth - NUM_COL_WIDTH},
+		{Title: "Val", Width: NUM_COL_WIDTH},
 	})
 }
 
@@ -112,10 +109,10 @@ func (t *groupTable) View() string {
 func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
+		t.Clear()
 		t.model.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
-		t.items = []parser.Item{}
 	}
 	group, ok := item.(parser.Group)
 	if !ok {
@@ -127,18 +124,18 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 
 func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
 	if len(group.Groups)+len(group.Entries) == 0 {
+		t.Clear()
 		t.model.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
 		t.model.SetStyles(t.stylesEmpty)
-		t.items = []parser.Item{}
 		return
 	}
 	t.SetItems(group.Groups, group.Entries)
 	t.model.SetStyles(t.styles)
-	t.model.SetCursor(0)
 	lastCursor, ok := (*lastCursors)[group.UUID]
 	if !ok {
+		t.model.SetCursor(0)
 		return
 	}
 	for i, item := range t.items {
@@ -164,11 +161,12 @@ func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 			return strings.ToLower(groupsSorted[i].Name) < strings.ToLower(groupsSorted[j].Name)
 		})
 		sort.Slice(entriesSorted, func(i, j int) bool {
-			firstTitle, err1 := entriesSorted[i].Get("Title")
-			secondTitle, err2 := entriesSorted[j].Get("Title")
-			if err1 != nil {
+			firstTitle, err := entriesSorted[i].Get("Title")
+			if err != nil {
 				return false
-			} else if err2 != nil {
+			}
+			secondTitle, err := entriesSorted[j].Get("Title")
+			if err != nil {
 				return true
 			}
 			return strings.ToLower(firstTitle.Inner) < strings.ToLower(secondTitle.Inner)
@@ -187,7 +185,7 @@ func (t *groupTable) SetItems(groups []parser.Group, entries []parser.Entry) {
 }
 
 func (t *groupTable) FindAll(predicate func(parser.Item) bool) []string {
-	uuids := make([]string, 0)
+	uuids := []string{}
 	for _, item := range t.items {
 		if predicate(item) {
 			uuids = append(uuids, item.GetUUID())
@@ -210,6 +208,7 @@ func (t *groupTable) SetFocusToUUID(uuid string) error {
 	for i, item := range t.items {
 		if uuid == item.GetUUID() {
 			t.model.SetCursor(i)
+			return nil
 		}
 	}
 	return fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
@@ -234,6 +233,7 @@ func (t *entryTable) Resize(width, height int) {
 	firstColWidth := (width - frameWidth) * 4 / 10
 	secondColWidth := width - firstColWidth - 2*frameWidth
 	newColumns := []table.Column{
+		// These Titles don't matter, since table headers will be truncated anyway
 		{Title: "Key", Width: firstColWidth},
 		{Title: "Value", Width: secondColWidth},
 	}
@@ -258,7 +258,7 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		visited[field.key] = struct{}{}
 	}
 	for _, field := range entry.Strings {
-		if _, v := visited[field.Key]; v {
+		if _, skip := visited[field.Key]; skip {
 			continue
 		}
 		if field.Value.Protected {
@@ -275,7 +275,7 @@ func (t entryTable) View() string {
 	return truncateHeader(t.model.View())
 }
 
-// truncateHeader removes the header of a bubbles.Table by
+// truncateHeader removes the header of a bubbles table by
 // deleting everything up to (and including) the first newline
 func truncateHeader(s string) string {
 	split := strings.SplitN(s, "\n", 2)
