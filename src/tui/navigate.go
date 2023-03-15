@@ -49,7 +49,8 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		Cell:   lipgloss.NewStyle(),
 		Selected: lipgloss.NewStyle().
 			Reverse(true).
-			Bold(true),
+			Bold(true).
+			Foreground(lipgloss.Color("#9dcbf4")),
 	}
 	n := Navigate{
 		path:         []string{},
