@@ -126,10 +126,10 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
 	t.model.SetStyles(t.styles)
 	if len(group.Groups)+len(group.Entries) == 0 {
+		t.Clear()
 		t.model.SetRows([]table.Row{
 			{GROUP_PLACEH, ""},
 		})
-		t.items = []parser.Item{}
 		return
 	}
 	t.LoadItems(group.Groups, group.Entries)
