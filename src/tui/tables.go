@@ -15,7 +15,7 @@ import (
 const (
 	GROUP_PLACEH     = "(No entries)"
 	TITLE_PLACEH     = "(No title)"
-	ENCRYPTED_PLACEH = "******"
+	ENCRYPTED_PLACEH = "••••••"
 	NUM_COL_WIDTH    = 3
 )
 
