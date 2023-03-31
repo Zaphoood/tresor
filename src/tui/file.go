@@ -10,7 +10,7 @@ import (
 
 /* Inital model where you enter the path to the database */
 
-type SelectFile struct {
+type FileSelector struct {
 	focusIndex int
 	input      textinput.Model
 	err        error
@@ -24,8 +24,8 @@ type SelectFile struct {
 	windowHeight int
 }
 
-func NewSelectFile() SelectFile {
-	m := SelectFile{input: textinput.New()}
+func NewFileSelector() FileSelector {
+	m := FileSelector{input: textinput.New()}
 
 	m.input.Width = 32
 	m.input.Placeholder = "File"
@@ -34,11 +34,11 @@ func NewSelectFile() SelectFile {
 	return m
 }
 
-func (m SelectFile) Init() tea.Cmd {
+func (m FileSelector) Init() tea.Cmd {
 	return nil
 }
 
-func (m SelectFile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m FileSelector) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case loadFailedMsg:
@@ -100,7 +100,7 @@ func (m SelectFile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *SelectFile) loadCompletions() error {
+func (m *FileSelector) loadCompletions() error {
 	input := m.input.Value()
 	var err error
 	m.completions, err = completePath(input)
@@ -114,7 +114,7 @@ func (m *SelectFile) loadCompletions() error {
 	return nil
 }
 
-func (m *SelectFile) cycleCompletion(n int) {
+func (m *FileSelector) cycleCompletion(n int) {
 	if n != 1 && n != 0 && n != -1 {
 		return
 	}
@@ -131,7 +131,7 @@ func (m *SelectFile) cycleCompletion(n int) {
 	}
 }
 
-func (m SelectFile) View() string {
+func (m FileSelector) View() string {
 	var builder strings.Builder
 	builder.WriteString("Select file:\n\n")
 

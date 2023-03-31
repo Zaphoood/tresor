@@ -9,7 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type Decrypt struct {
+type PasswordInput struct {
 	focusIndex int
 	input      textinput.Model
 	err        error
@@ -20,8 +20,8 @@ type Decrypt struct {
 	database *database.Database
 }
 
-func NewDecrypt(database *database.Database, windowWidth, windowHeight int) Decrypt {
-	m := Decrypt{
+func NewPasswordInput(database *database.Database, windowWidth, windowHeight int) PasswordInput {
+	m := PasswordInput{
 		input:        textinput.New(),
 		database:     database,
 		windowWidth:  windowWidth,
@@ -37,11 +37,11 @@ func NewDecrypt(database *database.Database, windowWidth, windowHeight int) Decr
 	return m
 }
 
-func (m Decrypt) Init() tea.Cmd {
+func (m PasswordInput) Init() tea.Cmd {
 	return nil
 }
 
-func (m Decrypt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m PasswordInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case decryptFailedMsg:
@@ -91,7 +91,7 @@ func (m Decrypt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Decrypt) View() string {
+func (m PasswordInput) View() string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Enter password for %s:\n\n", m.database.Path()))
 
