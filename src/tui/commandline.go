@@ -126,7 +126,7 @@ func (c *CommandLine) onSearchInput() tea.Cmd {
 	if err != nil {
 		return nil
 	}
-	return func() tea.Msg { return searchInputMsg{inputAsSearch} }
+	return func() tea.Msg { return searchInputMsg{inputAsSearch, false} }
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
@@ -185,5 +185,6 @@ type commandInputMsg struct {
 }
 
 type searchInputMsg struct {
-	query string
+	query   string
+	reverse bool
 }
