@@ -9,10 +9,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type Decrypt struct {
-	focusIndex int
-	input      textinput.Model
-	err        error
+type PasswordInput struct {
+	input textinput.Model
+	err   error
 
 	windowWidth  int
 	windowHeight int
@@ -20,8 +19,8 @@ type Decrypt struct {
 	database *database.Database
 }
 
-func NewDecrypt(database *database.Database, windowWidth, windowHeight int) Decrypt {
-	m := Decrypt{
+func NewPasswordInput(database *database.Database, windowWidth, windowHeight int) PasswordInput {
+	m := PasswordInput{
 		input:        textinput.New(),
 		database:     database,
 		windowWidth:  windowWidth,
@@ -37,19 +36,17 @@ func NewDecrypt(database *database.Database, windowWidth, windowHeight int) Decr
 	return m
 }
 
-func (m Decrypt) Init() tea.Cmd {
+func (m PasswordInput) Init() tea.Cmd {
 	return nil
 }
 
-func (m Decrypt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m PasswordInput) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case decryptFailedMsg:
 		m.err = msg.err
-		m.focusIndex = 0
 		m.input.SetValue("")
-		cmd = m.input.Focus()
-		return m, cmd
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
@@ -58,32 +55,8 @@ func (m Decrypt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-		case "tab", "shift+tab", "enter", "up", "down":
-			s := msg.String()
-
-			if s == "enter" {
-				return m, decryptFileCmd(m.database, m.input.Value())
-			}
-
-			if s == "down" || s == "tab" {
-				m.focusIndex++
-			} else if s == "up" || s == "shift+tab" {
-				m.focusIndex--
-			}
-
-			if m.focusIndex > 1 {
-				m.focusIndex = 0
-			} else if m.focusIndex < 0 {
-				m.focusIndex = 1
-			}
-
-			if m.focusIndex == 0 {
-				cmd = m.input.Focus()
-				return m, cmd
-			} else {
-				m.input.Blur()
-			}
-			return m, nil
+		case "enter":
+			return m, decryptFileCmd(m.database, m.input.Value())
 		}
 	}
 	m.input, cmd = m.input.Update(msg)
@@ -91,24 +64,19 @@ func (m Decrypt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Decrypt) View() string {
+func (m PasswordInput) viewError() string {
+	if m.err != nil {
+		return fmt.Sprintf("\n%s\n", m.err)
+	}
+	return ""
+}
+
+func (m PasswordInput) View() string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Enter password for %s:\n\n", m.database.Path()))
-
 	builder.WriteString(m.input.View())
 	builder.WriteRune('\n')
-
-	if m.err != nil {
-		builder.WriteRune('\n')
-		builder.WriteString(m.err.Error())
-		builder.WriteRune('\n')
-	}
-
-	if m.focusIndex == 1 {
-		builder.WriteString("\n[ OK ]\n")
-	} else {
-		builder.WriteString("\n  OK  \n")
-	}
+	builder.WriteString(m.viewError())
 	builder.WriteString("\n(Press 'Ctrl-c' to quit)")
 
 	return centerInWindow(boxStyle.Render(builder.String()), m.windowWidth, m.windowHeight)

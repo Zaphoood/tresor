@@ -18,6 +18,10 @@ import (
 
 const CLEAR_CLIPBOARD_DELAY = 10
 
+const TABLE_SPACING = 1
+
+var tablePadding lipgloss.Style = lipgloss.NewStyle().PaddingRight(TABLE_SPACING)
+
 type Navigate struct {
 	parent       groupTable
 	selector     groupTable
@@ -33,7 +37,6 @@ type Navigate struct {
 	path []string
 	err  error
 
-	styles       table.Styles
 	windowWidth  int
 	windowHeight int
 
@@ -41,8 +44,15 @@ type Navigate struct {
 }
 
 func NewNavigate(database *database.Database, windowWidth, windowHeight int) Navigate {
+	styles := table.Styles{
+		Header: lipgloss.NewStyle().Bold(true),
+		Cell:   lipgloss.NewStyle(),
+		Selected: lipgloss.NewStyle().
+			Reverse(true).
+			Bold(true).
+			Foreground(lipgloss.Color("#9dcbf4")),
+	}
 	n := Navigate{
-		styles:       table.DefaultStyles(),
 		path:         []string{},
 		lastCursor:   make(map[string]string),
 		windowWidth:  windowWidth,
@@ -50,12 +60,12 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		database:     database,
 	}
 	n.cmdLine = NewCommandLine()
-	n.parent = newGroupTable(n.styles, true, false)
-	n.selector = newGroupTable(n.styles, true, true, table.WithFocused(true))
-	n.groupPreview = newGroupTable(n.styles, true, false)
+	n.parent = newGroupTable(styles, true, false)
+	n.selector = newGroupTable(styles, true, true, table.WithFocused(true))
+	n.groupPreview = newGroupTable(styles, true, false)
 	n.entryPreview = newEntryTable(table.Styles{
-		Header:   n.styles.Header.Copy(),
-		Cell:     n.styles.Cell.Copy(),
+		Header:   styles.Header.Copy(),
+		Cell:     styles.Cell.Copy(),
 		Selected: lipgloss.NewStyle(),
 	})
 
@@ -73,10 +83,12 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 }
 
 func (n *Navigate) resizeAll() {
-	selectorWidth := int(float64(n.windowWidth) * 0.3)
-	previewWidth := int(float64(n.windowWidth) * 0.5)
-	parentWidth := n.windowWidth - selectorWidth - previewWidth
-	height := n.windowHeight - n.cmdLine.GetHeight()
+	totalWidth := n.windowWidth - 2*TABLE_SPACING
+	totalHeight := n.windowHeight - n.cmdLine.GetHeight()
+	selectorWidth := int(float64(totalWidth) * 0.3)
+	previewWidth := int(float64(totalWidth) * 0.5)
+	parentWidth := totalWidth - selectorWidth - previewWidth
+	height := totalHeight
 
 	n.parent.Resize(parentWidth, height)
 	n.selector.Resize(selectorWidth, height)
@@ -348,6 +360,11 @@ func (n Navigate) View() string {
 	case parser.Entry:
 		preview = n.entryPreview.View()
 	}
-	tables := lipgloss.JoinHorizontal(lipgloss.Top, n.parent.View(), n.selector.View(), preview)
+	tables := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		tablePadding.Render(n.parent.View()),
+		tablePadding.Render(n.selector.View()),
+		preview,
+	)
 	return lipgloss.JoinVertical(lipgloss.Left, tables, n.cmdLine.View())
 }

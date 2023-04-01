@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -10,22 +11,21 @@ import (
 
 /* Inital model where you enter the path to the database */
 
-type SelectFile struct {
-	focusIndex int
-	input      textinput.Model
-	err        error
+type FileSelector struct {
+	input textinput.Model
+	err   error
 
-	pathWithoutCompletion string
-	completions           []string
-	completionIndex       int
-	cyclingCompletions    bool
+	completionBase     string
+	completions        []string
+	completionIndex    int
+	cyclingCompletions bool
 
 	windowWidth  int
 	windowHeight int
 }
 
-func NewSelectFile() SelectFile {
-	m := SelectFile{input: textinput.New()}
+func NewFileSelector() FileSelector {
+	m := FileSelector{input: textinput.New()}
 
 	m.input.Width = 32
 	m.input.Placeholder = "File"
@@ -34,18 +34,16 @@ func NewSelectFile() SelectFile {
 	return m
 }
 
-func (m SelectFile) Init() tea.Cmd {
+func (m FileSelector) Init() tea.Cmd {
 	return nil
 }
 
-func (m SelectFile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m FileSelector) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case loadFailedMsg:
 		m.err = msg.err
-		m.focusIndex = 0
-		cmd = m.input.Focus()
-		return m, cmd
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
@@ -55,40 +53,22 @@ func (m SelectFile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "tab":
-			if !m.cyclingCompletions {
+			if m.cyclingCompletions {
+				m.cycleCompletion(1)
+			} else {
 				m.cyclingCompletions = true
 				err := m.loadCompletions()
 				if err != nil {
 					m.err = err
 				}
 				m.cycleCompletion(0)
-			} else {
-				m.cycleCompletion(1)
 			}
 		case "shift+tab":
 			if m.cyclingCompletions && len(m.completions) > 0 {
 				m.cycleCompletion(-1)
 			}
-		case "enter", "up", "down":
-			s := msg.String()
-
-			if s == "enter" {
-				return m, fileSelectedCmd(m.input.Value())
-			}
-
-			if s == "down" {
-				m.focusIndex++
-			} else if s == "up" {
-				m.focusIndex--
-			}
-			m.focusIndex = mod(m.focusIndex, 2)
-			if m.focusIndex == 0 {
-				cmd = m.input.Focus()
-				return m, cmd
-			} else {
-				m.input.Blur()
-			}
-			return m, nil
+		case "enter":
+			return m, fileSelectedCmd(m.input.Value())
 		}
 	}
 	oldValue := m.input.Value()
@@ -100,7 +80,7 @@ func (m SelectFile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *SelectFile) loadCompletions() error {
+func (m *FileSelector) loadCompletions() error {
 	input := m.input.Value()
 	var err error
 	m.completions, err = completePath(input)
@@ -110,13 +90,13 @@ func (m *SelectFile) loadCompletions() error {
 	if input == "~" {
 		input = "~/"
 	}
-	m.pathWithoutCompletion = filepath.Dir(input)
+	m.completionBase = filepath.Dir(input)
 	return nil
 }
 
-func (m *SelectFile) cycleCompletion(n int) {
-	if n != 1 && n != 0 && n != -1 {
-		return
+func (m *FileSelector) cycleCompletion(n int) {
+	if !(n == 1 || n == 0 || n == -1) {
+		panic(fmt.Sprintf("Cannot cycle completions by %d steps", n))
 	}
 	switch len(m.completions) {
 	case 0:
@@ -126,29 +106,24 @@ func (m *SelectFile) cycleCompletion(n int) {
 		fallthrough
 	default:
 		m.completionIndex = mod(m.completionIndex+n, len(m.completions))
-		m.input.SetValue(joinRetainTrailingSep(m.pathWithoutCompletion, m.completions[m.completionIndex]))
+		m.input.SetValue(joinRetainTrailingSep(m.completionBase, m.completions[m.completionIndex]))
 		m.input.SetCursor(len(m.input.Value()))
 	}
 }
 
-func (m SelectFile) View() string {
+func (m FileSelector) viewError() string {
+	if m.err != nil {
+		return fmt.Sprintf("\n%s\n", m.err)
+	}
+	return ""
+}
+
+func (m FileSelector) View() string {
 	var builder strings.Builder
 	builder.WriteString("Select file:\n\n")
-
 	builder.WriteString(m.input.View())
 	builder.WriteRune('\n')
-
-	if m.err != nil {
-		builder.WriteRune('\n')
-		builder.WriteString(m.err.Error())
-		builder.WriteRune('\n')
-	}
-
-	if m.focusIndex == 1 {
-		builder.WriteString("\n[ OK ]\n")
-	} else {
-		builder.WriteString("\n  OK  \n")
-	}
+	builder.WriteString(m.viewError())
 	builder.WriteString("\n(Press 'Ctrl-c' to quit)")
 
 	return centerInWindow(boxStyle.Render(builder.String()), m.windowWidth, m.windowHeight)

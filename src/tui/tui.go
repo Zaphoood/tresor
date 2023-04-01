@@ -10,17 +10,17 @@ import (
 type viewState int
 
 const (
-	selectFileView viewState = iota
-	decryptView
+	fileSelectorView viewState = iota
+	passwordView
 	navigateView
 )
 
 type MainModel struct {
 	// Which sub-model we are currently viewing
-	view       viewState
-	selectFile tea.Model
-	decrypt    tea.Model
-	navigate   tea.Model
+	view          viewState
+	fileSelector  tea.Model
+	passwordInput tea.Model
+	navigate      tea.Model
 	// Instead of asking the user for input, a database can be passed upon construction
 	// This is useful when files are openend via command line arguments
 	database *database.Database
@@ -30,9 +30,9 @@ type MainModel struct {
 }
 
 func NewMainModel(d *database.Database) MainModel {
-	return MainModel{view: selectFileView,
-		selectFile: NewSelectFile(),
-		database:   d,
+	return MainModel{view: fileSelectorView,
+		fileSelector: NewFileSelector(),
+		database:     d,
 	}
 }
 
@@ -52,7 +52,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
 	case loadDoneMsg:
-		cmds = append(cmds, m.initDecryptView(msg.database))
+		cmds = append(cmds, m.initPasswordView(msg.database))
 	case decryptDoneMsg:
 		cmds = append(cmds, m.initNavigateView(msg.database))
 	case globalResizeMsg:
@@ -61,39 +61,21 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.view {
-	case selectFileView:
-		newSelectFile, newCmd := m.selectFile.Update(msg)
-		newSelectFile, ok := newSelectFile.(SelectFile)
-		if !ok {
-			panic("Could not assert that newSelectFile is of type SelectFile after Update()")
-		}
-		m.selectFile = newSelectFile
-		cmd = newCmd
-	case decryptView:
-		newDecrypt, newCmd := m.decrypt.Update(msg)
-		newDecrypt, ok := newDecrypt.(Decrypt)
-		if !ok {
-			panic("Could not assert that newDecrypt is of type Decrypt after Update()")
-		}
-		m.decrypt = newDecrypt
-		cmd = newCmd
+	case fileSelectorView:
+		m.fileSelector, cmd = m.fileSelector.Update(msg)
+	case passwordView:
+		m.passwordInput, cmd = m.passwordInput.Update(msg)
 	case navigateView:
-		newNavigate, newCmd := m.navigate.Update(msg)
-		newNavigate, ok := newNavigate.(Navigate)
-		if !ok {
-			panic("Could not assert that newNavigate is of type Navigate after Update()")
-		}
-		m.navigate = newNavigate
-		cmd = newCmd
+		m.navigate, cmd = m.navigate.Update(msg)
 	}
 	cmds = append(cmds, cmd)
 	return m, tea.Batch(cmds...)
 }
 
-func (m *MainModel) initDecryptView(d *database.Database) tea.Cmd {
-	m.view = decryptView
-	m.decrypt = NewDecrypt(d, m.windowWidth, m.windowHeight)
-	return m.decrypt.Init()
+func (m *MainModel) initPasswordView(d *database.Database) tea.Cmd {
+	m.view = passwordView
+	m.passwordInput = NewPasswordInput(d, m.windowWidth, m.windowHeight)
+	return m.passwordInput.Init()
 }
 
 func (m *MainModel) initNavigateView(d *database.Database) tea.Cmd {
@@ -104,10 +86,10 @@ func (m *MainModel) initNavigateView(d *database.Database) tea.Cmd {
 
 func (m MainModel) View() string {
 	switch m.view {
-	case selectFileView:
-		return m.selectFile.View()
-	case decryptView:
-		return m.decrypt.View()
+	case fileSelectorView:
+		return m.fileSelector.View()
+	case passwordView:
+		return m.passwordInput.View()
 	case navigateView:
 		return m.navigate.View()
 	default:
