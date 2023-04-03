@@ -253,11 +253,8 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 	return fileSelectedCmd(path)
 }
 
-func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
-	if reverse {
-		panic("Reverse search is not implemented yet")
-	}
-	n.search = n.selector.FindAll(func(item parser.Item) bool {
+func (n *Navigate) handleSearch(query string, reverse bool) {
+	search := n.selector.FindAll(func(item parser.Item) bool {
 		switch item := item.(type) {
 		case parser.Group:
 			return strings.Contains(strings.ToLower(item.Name), strings.ToLower(query))
@@ -266,13 +263,19 @@ func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
 		}
 		return false
 	})
-	if len(n.search) == 0 {
+	if len(search) == 0 {
 		n.cmdLine.SetMessage(fmt.Sprintf("Not found: %s", query))
-	} else {
-		n.searchIndex = 0
-		n.selector.SetFocusToUUID(n.search[0])
 	}
-	return nil
+	if reverse {
+		n.search = make([]string, len(search))
+		for i := len(search) - 1; i >= 0; i-- {
+			n.search[len(search)-1-i] = search[i]
+		}
+	} else {
+		n.search = search
+	}
+	n.searchIndex = 0
+	n.selector.SetFocusToUUID(n.search[0])
 }
 
 func (n *Navigate) nextSearchResult() {
@@ -313,7 +316,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandInputMsg:
 		cmds = append(cmds, n.handleCommand(msg.cmd))
 	case searchInputMsg:
-		cmds = append(cmds, n.handleSearch(msg.query, msg.reverse))
+		n.handleSearch(msg.query, msg.reverse)
 	case saveDoneMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Saved to %s", msg.path))
 		cmds = append(cmds, msg.andThen)

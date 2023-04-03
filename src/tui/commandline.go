@@ -44,11 +44,14 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		if c.inputMode == inputNone {
+			// TODO: Make prompts constants
 			switch msg.String() {
 			case ":":
 				c.startInput(inputCommand, ":")
 			case "/":
 				c.startInput(inputSearch, "/")
+			case "?":
+				c.startInput(inputSearch, "?")
 			}
 			return c, nil
 		}
@@ -111,11 +114,20 @@ func (c *CommandLine) onCommandInput() tea.Cmd {
 }
 
 func (c *CommandLine) onSearchInput() tea.Cmd {
+	var reverse bool
+	switch c.input.Prompt {
+	case "/":
+		reverse = false
+	case "?":
+		reverse = true
+	default:
+		panic(fmt.Sprintf("Invalid Prompt after search input: '%s'", c.input.Prompt))
+	}
 	inputAsSearch, err := parseInputAsSearch(c.input.Value())
 	if err != nil || len(inputAsSearch) == 0 {
 		return nil
 	}
-	return func() tea.Msg { return searchInputMsg{inputAsSearch, false} }
+	return func() tea.Msg { return searchInputMsg{inputAsSearch, reverse} }
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
