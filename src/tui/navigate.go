@@ -124,6 +124,14 @@ func (n *Navigate) loadLastSelected() {
 	}
 }
 
+func (n *Navigate) saveLastSelected() {
+	currentGroupUUID := n.parent.FocusedUUID()
+	if len(currentGroupUUID) == 0 {
+		currentGroupUUID = n.selector.FocusedUUID()
+	}
+	n.database.Parsed().Meta.LastSelectedGroup = currentGroupUUID
+}
+
 func (n *Navigate) updatePreview() {
 	focused := n.focusedUUID()
 	if len(focused) == 0 {
@@ -237,6 +245,7 @@ func (n *Navigate) handleSaveCmd(cmd []string, quit bool) tea.Cmd {
 	if len(cmd) == 2 {
 		path = cmd[1]
 	}
+	n.saveLastSelected()
 	n.cmdLine.SetMessage("Saving...")
 	return saveToPathCmd(n.database, path, andThen)
 }
