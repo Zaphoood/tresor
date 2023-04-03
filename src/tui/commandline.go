@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -44,58 +46,54 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 		if c.inputMode == inputNone {
 			switch msg.String() {
 			case ":":
-				c.inputMode = inputCommand
-				c.input.Focus()
-				c.resetPrompt()
+				c.startInput(inputCommand, ":")
 			case "/":
-				c.inputMode = inputSearch
-				c.input.Focus()
-				c.resetPrompt()
+				c.startInput(inputSearch, "/")
 			}
 			return c, nil
 		}
 
 		switch msg.String() {
 		case "esc", "ctrl+c":
-			c.endInputMode()
+			c.endInput()
 			return c, nil
 		case "enter":
 			return c, c.onEnter()
-		}
-
-		c.input, cmd = c.input.Update(msg)
-
-		switch msg.String() {
 		case "backspace":
 			if len(c.input.Value()) == 0 {
-				c.endInputMode()
-				return c, nil
-			}
-		case "ctrl+w":
-			if len(c.input.Value()) == 0 {
-				c.resetPrompt()
+				c.endInput()
 				return c, nil
 			}
 		}
-
+		c.input, cmd = c.input.Update(msg)
 		return c, cmd
 	}
 	return c, nil
 }
 
-func (c *CommandLine) resetPrompt() {
-	switch c.inputMode {
-	case inputCommand:
-		c.input.SetValue(":")
-		c.input.SetCursor(1)
-	case inputSearch:
-		c.input.SetValue("/")
-		c.input.SetCursor(1)
-	}
+func (c *CommandLine) startInput(mode inputMode, prompt string) {
+	c.inputMode = mode
+	c.input.Focus()
+	c.input.SetValue("")
+	c.input.Prompt = prompt
+}
+
+func (c *CommandLine) endInput() {
+	log.Println("foo")
+	c.inputMode = inputNone
+	c.input.Blur()
+	c.message = DEFAULT_MESSAGE
 }
 
 func (c *CommandLine) onEnter() tea.Cmd {
-	switch c.inputMode {
+	if c.inputMode == inputNone {
+		return nil
+	}
+	inputMode := c.inputMode
+	c.endInput()
+	c.message = c.input.Prompt + c.input.Value()
+
+	switch inputMode {
 	case inputCommand:
 		return c.onCommandInput()
 	case inputSearch:
@@ -105,36 +103,26 @@ func (c *CommandLine) onEnter() tea.Cmd {
 }
 
 func (c *CommandLine) onCommandInput() tea.Cmd {
-	c.endInputMode()
-	c.message = c.input.Value()
 	cmdAsStrings, err := parseInputAsCommand(c.input.Value())
-	if err != nil {
-		// Input could not be parsed as command
-		// TODO: Consider displaying error message here
-		return nil
-	}
-	if len(cmdAsStrings) == 0 {
+	if err != nil || len(cmdAsStrings) == 0 {
 		return nil
 	}
 	return func() tea.Msg { return commandInputMsg{cmdAsStrings} }
 }
 
 func (c *CommandLine) onSearchInput() tea.Cmd {
-	c.endInputMode()
-	c.message = c.input.Value()
 	inputAsSearch, err := parseInputAsSearch(c.input.Value())
-	if err != nil {
+	if err != nil || len(inputAsSearch) == 0 {
 		return nil
 	}
 	return func() tea.Msg { return searchInputMsg{inputAsSearch, false} }
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
-	if len(input) == 0 || input[0] != byte(':') {
-		return nil, fmt.Errorf("ERROR: Commands must start with ':', got '%s'\n", input)
+	if len(input) == 0 {
+		return nil, errors.New("Empty command")
 	}
-	// Clean out empty strings
-	split := strings.Split(input[1:], " ")
+	split := strings.Split(input, " ")
 	cmd := make([]string, 0)
 	for _, s := range split {
 		if len(s) > 0 {
@@ -145,16 +133,10 @@ func parseInputAsCommand(input string) ([]string, error) {
 }
 
 func parseInputAsSearch(input string) (string, error) {
-	if len(input) == 0 || input[0] != byte('/') {
-		return "", fmt.Errorf("ERROR: Search must start with '/', got '%s'\n", input)
+	if len(input) == 0 {
+		return "", errors.New("Empty search")
 	}
-	return input[1:], nil
-}
-
-func (c *CommandLine) endInputMode() {
-	c.inputMode = inputNone
-	c.input.Blur()
-	c.message = DEFAULT_MESSAGE
+	return input, nil
 }
 
 func (c CommandLine) View() string {
