@@ -11,6 +11,9 @@ import (
 )
 
 const DEFAULT_MESSAGE = "Ready."
+const PROMPT_COMMAND = ":"
+const PROMPT_SEARCH = "/"
+const PROMPT_REV_SEARCH = "?"
 
 type inputMode int
 
@@ -44,14 +47,13 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		if c.inputMode == inputNone {
-			// TODO: Make prompts constants
 			switch msg.String() {
-			case ":":
-				c.startInput(inputCommand, ":")
-			case "/":
-				c.startInput(inputSearch, "/")
-			case "?":
-				c.startInput(inputSearch, "?")
+			case PROMPT_COMMAND:
+				c.startInput(inputCommand, PROMPT_COMMAND)
+			case PROMPT_SEARCH:
+				c.startInput(inputSearch, PROMPT_SEARCH)
+			case PROMPT_REV_SEARCH:
+				c.startInput(inputSearch, PROMPT_REV_SEARCH)
 			}
 			return c, nil
 		}
@@ -116,9 +118,9 @@ func (c *CommandLine) onCommandInput() tea.Cmd {
 func (c *CommandLine) onSearchInput() tea.Cmd {
 	var reverse bool
 	switch c.input.Prompt {
-	case "/":
+	case PROMPT_SEARCH:
 		reverse = false
-	case "?":
+	case PROMPT_REV_SEARCH:
 		reverse = true
 	default:
 		panic(fmt.Sprintf("Invalid Prompt after search input: '%s'", c.input.Prompt))
