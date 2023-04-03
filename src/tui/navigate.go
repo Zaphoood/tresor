@@ -191,6 +191,7 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 		return nil
 	}
 	notifyChange := clipboard.Write(clipboard.FmtText, []byte(unlocked.Inner))
+	n.cmdLine.SetMessage(fmt.Sprintf("Copied to clipboard. (Clearing in %d seconds)", CLEAR_CLIPBOARD_DELAY))
 
 	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChange)
 }
