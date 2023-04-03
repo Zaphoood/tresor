@@ -23,7 +23,9 @@ Sleep 1s
 Type "l"
 Sleep 1s
 Type@750ms "jjj"
-Sleep 3s
+Sleep 1.5s
+Type "y"
+Sleep 1.5s
 Type "h"
 
 Sleep 1s
