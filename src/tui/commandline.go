@@ -49,11 +49,11 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 		if c.inputMode == inputNone {
 			switch msg.String() {
 			case PROMPT_COMMAND:
-				c.startInput(inputCommand, PROMPT_COMMAND)
+				return c, c.startInput(inputCommand, PROMPT_COMMAND)
 			case PROMPT_SEARCH:
-				c.startInput(inputSearch, PROMPT_SEARCH)
+				return c, c.startInput(inputSearch, PROMPT_SEARCH)
 			case PROMPT_REV_SEARCH:
-				c.startInput(inputSearch, PROMPT_REV_SEARCH)
+				return c, c.startInput(inputSearch, PROMPT_REV_SEARCH)
 			}
 			return c, nil
 		}
@@ -76,11 +76,11 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	return c, nil
 }
 
-func (c *CommandLine) startInput(mode inputMode, prompt string) {
+func (c *CommandLine) startInput(mode inputMode, prompt string) tea.Cmd {
 	c.inputMode = mode
-	c.input.Focus()
 	c.input.SetValue("")
 	c.input.Prompt = prompt
+	return c.input.Focus()
 }
 
 func (c *CommandLine) endInput() {
