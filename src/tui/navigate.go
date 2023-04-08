@@ -352,21 +352,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		if !n.cmdLine.IsInputActive() {
-			switch msg.String() {
-			case "ctrl+c":
-				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
-			case "y":
-				cmd := n.copyToClipboard()
-				return n, cmd
-			case "l":
-				n.moveRight()
-			case "h":
-				n.moveLeft()
-			case "n":
-				n.nextSearchResult()
-			case "N":
-				n.previousSearchResult()
-			}
+			cmds = append(cmds, n.handleKey(msg))
 		}
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		cmds = append(cmds, cmd)
@@ -377,6 +363,24 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return n, tea.Batch(cmds...)
+}
+
+func (n *Navigate) handleKey(msg tea.KeyMsg) tea.Cmd {
+	switch msg.String() {
+	case "ctrl+c":
+		n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
+	case "y":
+		return n.copyToClipboard()
+	case "l":
+		n.moveRight()
+	case "h":
+		n.moveLeft()
+	case "n":
+		n.nextSearchResult()
+	case "N":
+		n.previousSearchResult()
+	}
+	return nil
 }
 
 func (n Navigate) View() string {
