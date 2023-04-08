@@ -50,7 +50,7 @@ These commands are currently available:
 
 Note that currently, the `:w` command is pretty much useless, since editing entries is not supported, so it's not possible to actually make changes to a file. However, the last selected group is, in fact, stored and remembered when re-opening.
 
-To search through the current group, type `/` followed by a query and press <kbd>Enter</kbd>.
+To search through the current group, type `/` (or `?` for backward search), followed by a query and press <kbd>Enter</kbd>.
 Cycle through search results using `n` and `N`.
 
 ## Roadmap
