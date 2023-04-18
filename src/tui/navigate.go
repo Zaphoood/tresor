@@ -284,6 +284,8 @@ func (n *Navigate) handleSearch(query string, reverse bool) {
 	})
 	if len(search) == 0 {
 		n.cmdLine.SetMessage(fmt.Sprintf("Not found: %s", query))
+		n.search = []string{}
+		return
 	}
 	if reverse {
 		n.search = make([]string, len(search))
