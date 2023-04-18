@@ -351,16 +351,19 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		if !n.cmdLine.IsInputActive() {
+		if !n.cmdLine.Focused() {
 			cmds = append(cmds, n.handleKey(msg))
 		}
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		cmds = append(cmds, cmd)
+		if n.cmdLine.Focused() {
+			n.selector.model.Blur()
+		} else {
+			n.selector.model.Focus()
+		}
 	}
-	if !n.cmdLine.IsInputActive() {
-		n.selector, cmd = n.selector.Update(msg)
-		cmds = append(cmds, cmd)
-	}
+	n.selector, cmd = n.selector.Update(msg)
+	cmds = append(cmds, cmd)
 
 	return n, tea.Batch(cmds...)
 }

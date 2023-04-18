@@ -168,7 +168,7 @@ func (c *CommandLine) SetMessage(msg string) {
 	c.message = msg
 }
 
-func (c CommandLine) IsInputActive() bool {
+func (c CommandLine) Focused() bool {
 	return c.inputMode != inputNone
 }
 
