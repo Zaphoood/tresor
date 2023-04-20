@@ -30,8 +30,9 @@ type Navigate struct {
 	lastCursor   map[string]string
 	cmdLine      CommandLine
 
-	search      []string
-	searchIndex int
+	search        []string
+	searchIndex   int
+	searchForward bool
 
 	path []string
 	err  error
@@ -273,7 +274,7 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 }
 
 func (n *Navigate) handleSearch(query string, reverse bool) {
-	search := n.selector.FindAll(func(item parser.Item) bool {
+	n.search = n.selector.FindAll(func(item parser.Item) bool {
 		switch item := item.(type) {
 		case parser.Group:
 			return strings.Contains(strings.ToLower(item.Name), strings.ToLower(query))
@@ -282,24 +283,36 @@ func (n *Navigate) handleSearch(query string, reverse bool) {
 		}
 		return false
 	})
-	if len(search) == 0 {
+	if len(n.search) == 0 {
 		n.cmdLine.SetMessage(fmt.Sprintf("Not found: %s", query))
-		n.search = []string{}
 		return
 	}
+	n.searchForward = !reverse
 	if reverse {
-		n.search = make([]string, len(search))
-		for i := len(search) - 1; i >= 0; i-- {
-			n.search[len(search)-1-i] = search[i]
-		}
+		n.searchIndex = len(n.search) - 1
 	} else {
-		n.search = search
+		n.searchIndex = 0
 	}
-	n.searchIndex = 0
-	n.selector.SetFocusToUUID(n.search[0])
+	n.selector.SetFocusToUUID(n.search[n.searchIndex])
 }
 
 func (n *Navigate) nextSearchResult() {
+	if n.searchForward {
+		n.incSearchIndex()
+	} else {
+		n.redSearchIndex()
+	}
+}
+
+func (n *Navigate) previousSearchResult() {
+	if n.searchForward {
+		n.redSearchIndex()
+	} else {
+		n.incSearchIndex()
+	}
+}
+
+func (n *Navigate) incSearchIndex() {
 	if len(n.search) == 0 {
 		return
 	}
@@ -307,7 +320,7 @@ func (n *Navigate) nextSearchResult() {
 	n.selector.SetFocusToUUID(n.search[n.searchIndex])
 }
 
-func (n *Navigate) previousSearchResult() {
+func (n *Navigate) redSearchIndex() {
 	if len(n.search) == 0 {
 		return
 	}
