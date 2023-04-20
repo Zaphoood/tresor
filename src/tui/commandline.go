@@ -84,7 +84,6 @@ func (c *CommandLine) startInput(mode inputMode, prompt string) tea.Cmd {
 }
 
 func (c *CommandLine) endInput() {
-	log.Println("foo")
 	c.inputMode = inputNone
 	c.input.Blur()
 	c.message = DEFAULT_MESSAGE
