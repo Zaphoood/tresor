@@ -27,7 +27,6 @@ type Navigate struct {
 	selector     groupTable
 	groupPreview groupTable
 	entryPreview entryTable
-	focusedItem  parser.Item
 	lastCursor   map[string]string
 	cmdLine      CommandLine
 
@@ -132,28 +131,34 @@ func (n *Navigate) saveLastSelected() {
 	n.database.Parsed().Meta.LastSelectedGroup = currentGroupUUID
 }
 
-func (n *Navigate) updatePreview() {
+// getFocusedItem returns the currently focused database item if it exists, otherwise nil
+func (n *Navigate) getFocusedItem() *parser.Item {
 	focused := n.focusedUUID()
 	if len(focused) == 0 {
-		n.groupPreview.Clear()
-		return
+		return nil
 	}
 	item, err := n.database.Parsed().GetItem(append(n.path, focused))
 	if err != nil {
-		log.Printf("ERROR: %s\n", err)
-		n.groupPreview.Clear()
+		log.Printf("ERROR: Failed to get focused item: %s\n", err)
+		return nil
+	}
+	return &item
+}
+
+func (n *Navigate) updatePreview() {
+	focusedItem := n.getFocusedItem()
+	if focusedItem == nil {
 		return
 	}
-	switch item := item.(type) {
+	switch focusedItem := (*focusedItem).(type) {
 	case parser.Group:
-		n.groupPreview.LoadGroup(item, &n.lastCursor)
+		n.groupPreview.LoadGroup(focusedItem, &n.lastCursor)
 	case parser.Entry:
-		n.entryPreview.LoadEntry(item, n.database)
+		n.entryPreview.LoadEntry(focusedItem, n.database)
 	default:
 		log.Printf("ERROR in updatePreview: Expected Group or Entry from GetItem()")
 		return
 	}
-	n.focusedItem = item
 }
 
 func (n *Navigate) moveLeft() {
@@ -189,7 +194,11 @@ func (n Navigate) focusedUUID() string {
 }
 
 func (n *Navigate) copyToClipboard() tea.Cmd {
-	focusedEntry, ok := n.focusedItem.(parser.Entry)
+	focusedItem := n.getFocusedItem()
+	if focusedItem == nil {
+		return nil
+	}
+	focusedEntry, ok := (*focusedItem).(parser.Entry)
 	if !ok {
 		return nil
 	}
@@ -369,12 +378,15 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (n Navigate) View() string {
-	var preview string
-	switch n.focusedItem.(type) {
-	case parser.Group:
-		preview = n.groupPreview.View()
-	case parser.Entry:
-		preview = n.entryPreview.View()
+	preview := ""
+	focusedItem := n.getFocusedItem()
+	if focusedItem != nil {
+		switch (*focusedItem).(type) {
+		case parser.Group:
+			preview = n.groupPreview.View()
+		case parser.Entry:
+			preview = n.entryPreview.View()
+		}
 	}
 	tables := lipgloss.JoinHorizontal(
 		lipgloss.Top,
