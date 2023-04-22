@@ -164,15 +164,6 @@ func (n *Navigate) updatePreview() {
 	}
 }
 
-func (n *Navigate) handleLeft() {
-	if n.entryPreview.Focused() {
-		n.selector.Focus()
-		n.entryPreview.Blur()
-	} else {
-		n.moveLeft()
-	}
-}
-
 func (n *Navigate) moveLeft() {
 	if len(n.path) == 0 {
 		return
@@ -182,29 +173,22 @@ func (n *Navigate) moveLeft() {
 	n.updateAll()
 }
 
-func (n *Navigate) handleRight() {
-	if n.entryPreview.Focused() {
-		return
-	}
-
-	selected, err := n.database.Parsed().GetItem(append(n.path, n.focusedUUID()))
+func (n *Navigate) moveRight() {
+	newPath := append(n.path, n.focusedUUID())
+	focusedItem, err := n.database.Parsed().GetItem(newPath)
 	if err != nil {
 		return
 	}
 
-	switch selected.(type) {
+	switch focusedItem.(type) {
 	case parser.Group:
-		n.moveRight()
+		n.rememberSelected()
+		n.path = newPath
+		n.updateAll()
 	case parser.Entry:
 		n.selector.Blur()
 		n.entryPreview.Focus()
 	}
-}
-
-func (n *Navigate) moveRight() {
-	n.rememberSelected()
-	n.path = append(n.path, n.focusedUUID())
-	n.updateAll()
 }
 
 func (n *Navigate) rememberSelected() {
@@ -381,6 +365,9 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
 	case loadFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
+	case leaveEntryEditor:
+		n.selector.Focus()
+		n.entryPreview.Blur()
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
@@ -388,8 +375,14 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		if !n.cmdLine.Focused() {
-			cmds = append(cmds, n.handleKey(msg))
+			if msg.String() == "ctrl+c" {
+				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
+			}
+			if !n.entryPreview.Focused() {
+				cmds = append(cmds, n.handleKeySelector(msg))
+			}
 		}
+
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		cmds = append(cmds, cmd)
 	}
@@ -403,16 +396,16 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return n, tea.Batch(cmds...)
 }
 
-func (n *Navigate) handleKey(msg tea.KeyMsg) tea.Cmd {
+// handleKeySelector handles key events for the selector table
+func (n *Navigate) handleKeySelector(msg tea.KeyMsg) tea.Cmd {
+	// TODO: Maybe this should be a method of groupTable
 	switch msg.String() {
-	case "ctrl+c":
-		n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
 	case "y":
 		return n.copyToClipboard()
 	case "l":
-		n.handleRight()
+		n.moveRight()
 	case "h":
-		n.handleLeft()
+		n.moveLeft()
 	case "n":
 		n.nextSearchResult()
 	case "N":

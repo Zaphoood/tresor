@@ -78,6 +78,11 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 
 func (t entryTable) Update(msg tea.Msg) (entryTable, tea.Cmd) {
 	var cmd tea.Cmd
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		if msg.String() == "h" {
+			return t, func() tea.Msg { return leaveEntryEditor{} }
+		}
+	}
 	t.model, cmd = t.model.Update(msg)
 	return t, cmd
 }
