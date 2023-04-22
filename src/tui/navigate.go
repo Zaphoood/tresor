@@ -16,8 +16,6 @@ import (
 
 /* Model for navigating the Database in order to view and edit entries */
 
-const CLEAR_CLIPBOARD_DELAY = 10
-
 const TABLE_SPACING = 1
 
 var tablePadding lipgloss.Style = lipgloss.NewStyle().PaddingRight(TABLE_SPACING)
@@ -228,15 +226,15 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 	if !ok {
 		return nil
 	}
-	unlocked, err := focusedEntry.Get("Password")
+
+	cmd, err := copyEntryFieldToClipboard(focusedEntry, "Password", CLEAR_CLIPBOARD_DELAY)
 	if err != nil {
-		log.Printf("ERROR: Failed to get field 'Password' for Entry '%s'\n", focusedEntry.UUID)
+		log.Println(err)
 		return nil
 	}
-	notifyChange := clipboard.Write(clipboard.FmtText, []byte(unlocked.Inner))
-	n.cmdLine.SetMessage(fmt.Sprintf("Copied to clipboard. (Clearing in %d seconds)", CLEAR_CLIPBOARD_DELAY))
 
-	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChange)
+	n.cmdLine.SetMessage(fmt.Sprintf("Copied to clipboard. (Clearing in %d seconds)", CLEAR_CLIPBOARD_DELAY))
+	return cmd
 }
 
 func (n *Navigate) handleCommand(cmd []string) tea.Cmd {
