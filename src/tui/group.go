@@ -201,15 +201,18 @@ func (t *groupTable) FocusedUUID() string {
 	return t.items[t.model.Cursor()].GetUUID()
 }
 
-func (t *groupTable) SetFocusToUUID(uuid string) error {
+func (t *groupTable) SetCursorToUUID(uuid string) (tea.Cmd, error) {
 	if len(t.items) == 0 {
-		return fmt.Errorf("Failed set cursor to UUID %s: Group is empty", uuid)
+		return nil, fmt.Errorf("Failed set cursor to UUID %s: Group is empty", uuid)
 	}
 	for i, item := range t.items {
 		if uuid == item.GetUUID() {
+			if i == t.model.Cursor() {
+				return nil, nil
+			}
 			t.model.SetCursor(i)
-			return nil
+			return func() tea.Msg { return groupTableCursorChanged{} }, nil
 		}
 	}
-	return fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
+	return nil, fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
 }

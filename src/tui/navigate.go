@@ -279,7 +279,7 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 	return fileSelectedCmd(path)
 }
 
-func (n *Navigate) handleSearch(query string, reverse bool) {
+func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
 	n.search = n.selector.FindAll(func(item parser.Item) bool {
 		switch item := item.(type) {
 		case parser.Group:
@@ -291,7 +291,7 @@ func (n *Navigate) handleSearch(query string, reverse bool) {
 	})
 	if len(n.search) == 0 {
 		n.cmdLine.SetMessage(fmt.Sprintf("Not found: %s", query))
-		return
+		return nil
 	}
 	n.searchForward = !reverse
 	if reverse {
@@ -299,39 +299,60 @@ func (n *Navigate) handleSearch(query string, reverse bool) {
 	} else {
 		n.searchIndex = 0
 	}
-	n.selector.SetFocusToUUID(n.search[n.searchIndex])
+
+	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return cmd
 }
 
 func (n *Navigate) nextSearchResult() {
 	if n.searchForward {
 		n.incSearchIndex()
 	} else {
-		n.redSearchIndex()
+		n.decSearchIndex()
 	}
 }
 
 func (n *Navigate) previousSearchResult() {
 	if n.searchForward {
-		n.redSearchIndex()
+		n.decSearchIndex()
 	} else {
 		n.incSearchIndex()
 	}
 }
 
-func (n *Navigate) incSearchIndex() {
+func (n *Navigate) incSearchIndex() tea.Cmd {
 	if len(n.search) == 0 {
-		return
+		return nil
 	}
 	n.searchIndex = (n.searchIndex + 1) % len(n.search)
-	n.selector.SetFocusToUUID(n.search[n.searchIndex])
+
+	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return cmd
 }
 
-func (n *Navigate) redSearchIndex() {
+func (n *Navigate) decSearchIndex() tea.Cmd {
 	if len(n.search) == 0 {
-		return
+		return nil
 	}
 	n.searchIndex = (n.searchIndex + len(n.search) - 1) % len(n.search)
-	n.selector.SetFocusToUUID(n.search[n.searchIndex])
+
+	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return cmd
 }
 
 func clearClipboard() {
@@ -356,7 +377,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandInputMsg:
 		cmds = append(cmds, n.handleCommand(msg.cmd))
 	case searchInputMsg:
-		n.handleSearch(msg.query, msg.reverse)
+		cmds = append(cmds, n.handleSearch(msg.query, msg.reverse))
 	case saveDoneMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Saved to %s", msg.path))
 		cmds = append(cmds, msg.andThen)
