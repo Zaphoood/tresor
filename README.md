@@ -35,7 +35,9 @@ To open a file, run `tresor <file>`. Alternatively, run just `tresor` and input 
 After inputting your password, the KeePass database should open.
 Navigate using the `h`, `j`, `k` and `l` keys, type `:q` and hit <kbd>Enter</kbd> to exit.
 
-When hovering over an entry, press `y` to copy its password to the system clipboard. The clipboard will be cleared automatically after ten seconds.
+When hovering over an entry, press `y` to copy its password to the system clipboard.
+After focusing an entry with `h` or <kbd>Enter</kbd>, you can select and copy specific fields (again using `y`).
+For encrypted values, the clipboard will be cleared automatically after ten seconds.
 
 Commands work just like in vim: To execute a command, type `:` followed by the command and press <kbd>Enter</kbd>.
 These commands are currently available:
