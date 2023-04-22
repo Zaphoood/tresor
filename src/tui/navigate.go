@@ -205,7 +205,7 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 	}
 	unlocked, err := focusedEntry.Get("Password")
 	if err != nil {
-		log.Printf("Failed to get Password for '%s'\n", focusedEntry.UUID)
+		log.Printf("ERROR: Failed to get field 'Password' for Entry '%s'\n", focusedEntry.UUID)
 		return nil
 	}
 	notifyChange := clipboard.Write(clipboard.FmtText, []byte(unlocked.Inner))

@@ -3,7 +3,6 @@ package tui
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
