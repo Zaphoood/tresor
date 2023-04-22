@@ -44,7 +44,12 @@ func (c CommandLine) Init() tea.Cmd {
 
 func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	var cmd tea.Cmd
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	switch msg := msg.(type) {
+	case setCommandLineMessageMsg:
+		// TODO: Consider calling it the command line's 'status' instead in order to avoid these unfortunate variable names
+		c.SetMessage(msg.msg)
+		return c, nil
+	case tea.KeyMsg:
 		if c.inputMode == inputNone {
 			switch msg.String() {
 			case PROMPT_COMMAND:

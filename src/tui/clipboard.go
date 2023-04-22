@@ -12,10 +12,17 @@ const CLEAR_CLIPBOARD_DELAY = 3
 
 func copyToClipboard(value string, clearClipboardDelay int) tea.Cmd {
 	notifyChangeChan := clipboard.Write(clipboard.FmtText, []byte(value))
+
+	commandLineMsg := "Copied to clipboard."
+	var clearClipboardCmd tea.Cmd = nil
 	if clearClipboardDelay > 0 {
-		return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChangeChan)
+		commandLineMsg += fmt.Sprintf(" (Clearing in %d seconds)", CLEAR_CLIPBOARD_DELAY)
+		clearClipboardCmd = scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChangeChan)
 	}
-	return nil
+	setMsgCmd := func() tea.Msg {
+		return setCommandLineMessageMsg{commandLineMsg}
+	}
+	return tea.Batch(setMsgCmd, clearClipboardCmd)
 }
 
 func copyEntryFieldToClipboard(entry parser.Entry, field string, clearClipboardDelay int) (tea.Cmd, error) {

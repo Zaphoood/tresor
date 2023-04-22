@@ -206,6 +206,7 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 	if focusedItem == nil {
 		return nil
 	}
+
 	focusedEntry, ok := (*focusedItem).(parser.Entry)
 	if !ok {
 		return nil
@@ -216,8 +217,6 @@ func (n *Navigate) copyToClipboard() tea.Cmd {
 		log.Println(err)
 		return nil
 	}
-
-	n.cmdLine.SetMessage(fmt.Sprintf("Copied to clipboard. (Clearing in %d seconds)", CLEAR_CLIPBOARD_DELAY))
 	return cmd
 }
 
@@ -382,10 +381,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, n.handleKeySelector(msg))
 			}
 		}
-
-		n.cmdLine, cmd = n.cmdLine.Update(msg)
-		cmds = append(cmds, cmd)
 	}
+	n.cmdLine, cmd = n.cmdLine.Update(msg)
+	cmds = append(cmds, cmd)
+
 	if !n.cmdLine.Focused() {
 		n.selector, cmd = n.selector.Update(msg)
 		cmds = append(cmds, cmd)

@@ -132,6 +132,8 @@ func (t *entryTable) copyToClipboard() tea.Cmd {
 		return nil
 	}
 
+	// TODO: Set status message
+
 	clipboardDelay := 0
 	if value.Protected {
 		clipboardDelay = CLEAR_CLIPBOARD_DELAY
