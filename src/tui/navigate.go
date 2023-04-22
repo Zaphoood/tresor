@@ -44,13 +44,18 @@ type Navigate struct {
 }
 
 func NewNavigate(database *database.Database, windowWidth, windowHeight int) Navigate {
-	styles := table.Styles{
+	tableStyles := table.Styles{
 		Header: lipgloss.NewStyle().Bold(true),
 		Cell:   lipgloss.NewStyle(),
 		Selected: lipgloss.NewStyle().
 			Reverse(true).
 			Bold(true).
 			Foreground(lipgloss.Color("#9dcbf4")),
+	}
+	tableStylesBlurred := table.Styles{
+		Header:   tableStyles.Header.Copy(),
+		Cell:     tableStyles.Cell.Copy(),
+		Selected: lipgloss.NewStyle(),
 	}
 	n := Navigate{
 		path:         []string{},
@@ -60,14 +65,13 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		database:     database,
 	}
 	n.cmdLine = NewCommandLine()
-	n.parent = newGroupTable(styles, true, false)
-	n.selector = newGroupTable(styles, true, true, table.WithFocused(true))
-	n.groupPreview = newGroupTable(styles, true, false)
-	n.entryPreview = newEntryTable(table.Styles{
-		Header:   styles.Header.Copy(),
-		Cell:     styles.Cell.Copy(),
-		Selected: lipgloss.NewStyle(),
-	})
+	n.parent = newGroupTable(tableStyles, true, false)
+	n.selector = newGroupTable(tableStyles, true, true, table.WithFocused(true))
+	n.groupPreview = newGroupTable(tableStyles, true, false)
+	n.entryPreview = newEntryTable(
+		tableStyles,
+		tableStylesBlurred,
+	)
 
 	n.resizeAll()
 	n.loadLastSelected()
@@ -162,6 +166,15 @@ func (n *Navigate) updatePreview() {
 	}
 }
 
+func (n *Navigate) handleLeft() {
+	if n.entryPreview.Focused() {
+		n.selector.Focus()
+		n.entryPreview.Blur()
+	} else {
+		n.moveLeft()
+	}
+}
+
 func (n *Navigate) moveLeft() {
 	if len(n.path) == 0 {
 		return
@@ -171,14 +184,26 @@ func (n *Navigate) moveLeft() {
 	n.updateAll()
 }
 
-func (n *Navigate) moveRight() {
+func (n *Navigate) handleRight() {
+	if n.entryPreview.Focused() {
+		return
+	}
+
 	selected, err := n.database.Parsed().GetItem(append(n.path, n.focusedUUID()))
 	if err != nil {
 		return
 	}
-	if _, ok := selected.(parser.Group); !ok {
-		return
+
+	switch selected.(type) {
+	case parser.Group:
+		n.moveRight()
+	case parser.Entry:
+		n.selector.Blur()
+		n.entryPreview.Focus()
 	}
+}
+
+func (n *Navigate) moveRight() {
 	n.rememberSelected()
 	n.path = append(n.path, n.focusedUUID())
 	n.updateAll()
@@ -369,14 +394,13 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		cmds = append(cmds, cmd)
-		if n.cmdLine.Focused() {
-			n.selector.model.Blur()
-		} else {
-			n.selector.model.Focus()
-		}
 	}
-	n.selector, cmd = n.selector.Update(msg)
-	cmds = append(cmds, cmd)
+	if !n.cmdLine.Focused() {
+		n.selector, cmd = n.selector.Update(msg)
+		cmds = append(cmds, cmd)
+		n.entryPreview, cmd = n.entryPreview.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	return n, tea.Batch(cmds...)
 }
@@ -388,9 +412,9 @@ func (n *Navigate) handleKey(msg tea.KeyMsg) tea.Cmd {
 	case "y":
 		return n.copyToClipboard()
 	case "l":
-		n.moveRight()
+		n.handleRight()
 	case "h":
-		n.moveLeft()
+		n.handleLeft()
 	case "n":
 		n.nextSearchResult()
 	case "N":

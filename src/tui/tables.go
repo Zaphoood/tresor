@@ -29,7 +29,7 @@ type entryField struct {
 	defaultValue string
 }
 
-var defaultFields []entryField = []entryField{
+var defaultEntryFields []entryField = []entryField{
 	{"Title", "Title", TITLE_PLACEH},
 	{"UserName", "Username", ""},
 	{"Password", "Password", ""},
@@ -87,10 +87,6 @@ func (t *groupTable) Clear() {
 	t.model.SetStyles(t.stylesEmpty)
 }
 
-func (t *groupTable) Init() tea.Cmd {
-	return nil
-}
-
 func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
 	var cmd tea.Cmd
 	oldCursor := t.model.Cursor()
@@ -103,6 +99,18 @@ func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
 
 func (t *groupTable) View() string {
 	return truncateHeader(t.model.View())
+}
+
+func (t *groupTable) Focus() {
+	t.model.Focus()
+}
+
+func (t *groupTable) Blur() {
+	t.model.Blur()
+}
+
+func (t *groupTable) Focused() bool {
+	return t.model.Focused()
 }
 
 func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
@@ -215,21 +223,23 @@ func (t *groupTable) SetFocusToUUID(uuid string) error {
 }
 
 type entryTable struct {
-	model  table.Model
-	styles table.Styles
+	model         table.Model
+	stylesFocused table.Styles
+	stylesBlurred table.Styles
 }
 
-func newEntryTable(styles table.Styles, options ...table.Option) entryTable {
+func newEntryTable(stylesFocused table.Styles, stylesBlurred table.Styles, options ...table.Option) entryTable {
 	return entryTable{
-		model:  table.New(append(options, table.WithStyles(styles))...),
-		styles: styles,
+		model:         table.New(append(options, table.WithStyles(stylesBlurred))...),
+		stylesFocused: stylesFocused,
+		stylesBlurred: stylesBlurred,
 	}
 }
 
 func (t *entryTable) Resize(width, height int) {
 	t.model.SetWidth(width)
 	t.model.SetHeight(height)
-	frameWidth, _ := t.styles.Header.GetFrameSize()
+	frameWidth, _ := t.stylesFocused.Header.GetFrameSize()
 	firstColWidth := (width - frameWidth) * 4 / 10
 	secondColWidth := width - firstColWidth - 2*frameWidth
 	newColumns := []table.Column{
@@ -245,7 +255,7 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	rows := make([]table.Row, 0, len(entry.Strings))
 	visited := make(map[string]struct{})
 	var value string
-	for _, field := range defaultFields {
+	for _, field := range defaultEntryFields {
 		r, err := entry.Get(field.key)
 		if err != nil {
 			value = field.defaultValue
@@ -271,8 +281,29 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	t.model.SetRows(rows)
 }
 
+func (t entryTable) Update(msg tea.Msg) (entryTable, tea.Cmd) {
+	var cmd tea.Cmd
+	t.model, cmd = t.model.Update(msg)
+	return t, cmd
+}
+
 func (t entryTable) View() string {
 	return truncateHeader(t.model.View())
+}
+
+func (t *entryTable) Focus() {
+	t.model.SetCursor(0)
+	t.model.Focus()
+	t.model.SetStyles(t.stylesFocused)
+}
+
+func (t *entryTable) Blur() {
+	t.model.Blur()
+	t.model.SetStyles(t.stylesBlurred)
+}
+
+func (t *entryTable) Focused() bool {
+	return t.model.Focused()
 }
 
 // truncateHeader removes the header of a bubbles table by
