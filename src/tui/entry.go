@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"log"
 	"strings"
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
@@ -21,6 +22,10 @@ type entryTable struct {
 	model         table.Model
 	stylesFocused table.Styles
 	stylesBlurred table.Styles
+
+	entry parser.Entry
+	// The keys of the currently viewed entry's string fields, in order they are displayed
+	fieldKeys []string
 }
 
 func newEntryTable(stylesFocused table.Styles, stylesBlurred table.Styles, options ...table.Option) entryTable {
@@ -47,6 +52,8 @@ func (t *entryTable) Resize(width, height int) {
 }
 
 func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
+	t.entry = entry
+	t.fieldKeys = make([]string, 0, len(entry.Strings))
 	rows := make([]table.Row, 0, len(entry.Strings))
 	visited := make(map[string]struct{})
 	var value string
@@ -60,6 +67,7 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 			value = r.Inner
 		}
 		rows = append(rows, table.Row{field.displayName, value})
+		t.fieldKeys = append(t.fieldKeys, field.key)
 		visited[field.key] = struct{}{}
 	}
 	for _, field := range entry.Strings {
@@ -72,6 +80,7 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 			value = field.Value.Inner
 		}
 		rows = append(rows, table.Row{field.Key, value})
+		t.fieldKeys = append(t.fieldKeys, field.Key)
 	}
 	t.model.SetRows(rows)
 }
@@ -79,8 +88,12 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 func (t entryTable) Update(msg tea.Msg) (entryTable, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
-		if msg.String() == "h" {
+		switch msg.String() {
+		case "h", "esc":
 			return t, func() tea.Msg { return leaveEntryEditor{} }
+		case "y":
+			cmd = t.copyToClipboard()
+			return t, cmd
 		}
 	}
 	t.model, cmd = t.model.Update(msg)
@@ -104,6 +117,26 @@ func (t *entryTable) Blur() {
 
 func (t *entryTable) Focused() bool {
 	return t.model.Focused()
+}
+
+// copyToClipboard copies the value of the currently focused field to the clipboard
+func (t *entryTable) copyToClipboard() tea.Cmd {
+	// We have to get the key by indexing the table rows,
+	// since the display order of strings may be different
+	// from the order in t.entry.Strings
+	// TODO: This is a bit hacky, maybe find a less confusing solution
+	key := t.fieldKeys[t.model.Cursor()]
+	value, err := t.entry.Get(key)
+	if err != nil {
+		log.Printf("ERROR: Could not retrieve value for key '%s' of entry '%s'", key, t.entry.GetUUID())
+		return nil
+	}
+
+	clipboardDelay := 0
+	if value.Protected {
+		clipboardDelay = CLEAR_CLIPBOARD_DELAY
+	}
+	return copyToClipboard(value.Inner, clipboardDelay)
 }
 
 // truncateHeader removes the header of a bubbles table by

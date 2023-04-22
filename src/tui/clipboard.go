@@ -8,16 +8,20 @@ import (
 	"golang.design/x/clipboard"
 )
 
-const CLEAR_CLIPBOARD_DELAY = 10
+const CLEAR_CLIPBOARD_DELAY = 3
+
+func copyToClipboard(value string, clearClipboardDelay int) tea.Cmd {
+	notifyChangeChan := clipboard.Write(clipboard.FmtText, []byte(value))
+	if clearClipboardDelay > 0 {
+		return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChangeChan)
+	}
+	return nil
+}
 
 func copyEntryFieldToClipboard(entry parser.Entry, field string, clearClipboardDelay int) (tea.Cmd, error) {
 	value, err := entry.Get(field)
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: Cannot copy to clipboard. Failed to get field '%s' for Entry '%s'\n", field, entry.UUID)
 	}
-	notifyChangeChan := clipboard.Write(clipboard.FmtText, []byte(value.Inner))
-	if clearClipboardDelay > 0 {
-		return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChangeChan), nil
-	}
-	return nil, nil
+	return copyToClipboard(value.Inner, clearClipboardDelay), nil
 }
