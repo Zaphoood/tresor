@@ -80,6 +80,10 @@ func (t *groupTable) Clear() {
 }
 
 func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
+	if !t.Focused() {
+		return t, nil
+	}
+
 	var cmd tea.Cmd
 	oldCursor := t.model.Cursor()
 	t.model, cmd = t.model.Update(msg)

@@ -86,6 +86,10 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 }
 
 func (t entryTable) Update(msg tea.Msg) (entryTable, tea.Cmd) {
+	if !t.Focused() {
+		return t, nil
+	}
+
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.String() {
