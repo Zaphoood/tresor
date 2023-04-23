@@ -73,7 +73,7 @@ func (v *Value) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	}
 
 	if stream == nil {
-		return errors.New("Error while unmarshalling protected Value: stream is nil")
+		return errors.New("Error while marshalling protected Value: stream is nil")
 	}
 	encrypted, err := stream.Encrypt([]byte(v.Inner))
 	if err != nil {
