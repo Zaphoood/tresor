@@ -8,7 +8,7 @@ import (
 	"golang.design/x/clipboard"
 )
 
-const CLEAR_CLIPBOARD_DELAY = 3
+const CLEAR_CLIPBOARD_DELAY = 10
 
 func initClipboard() {
 	err := clipboard.Init()
