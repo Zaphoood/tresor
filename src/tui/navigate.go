@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"golang.design/x/clipboard"
 )
 
 /* Model for navigating the Database in order to view and edit entries */
@@ -75,11 +74,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 	n.loadLastSelected()
 	n.updateAll()
 
-	err := clipboard.Init()
-	if err != nil {
-		// TODO: We should handle this more gracefully
-		panic(err)
-	}
+	initClipboard()
 
 	return n
 }
@@ -353,10 +348,6 @@ func (n *Navigate) decSearchIndex() tea.Cmd {
 	}
 
 	return cmd
-}
-
-func clearClipboard() {
-	clipboard.Write(clipboard.FmtText, []byte(""))
 }
 
 func (n Navigate) Init() tea.Cmd {

@@ -10,6 +10,14 @@ import (
 
 const CLEAR_CLIPBOARD_DELAY = 3
 
+func initClipboard() {
+	err := clipboard.Init()
+	if err != nil {
+		// TODO: We should handle this more gracefully
+		panic(err)
+	}
+}
+
 func copyToClipboard(value string, clearClipboardDelay int) tea.Cmd {
 	notifyChangeChan := clipboard.Write(clipboard.FmtText, []byte(value))
 
@@ -31,4 +39,8 @@ func copyEntryFieldToClipboard(entry parser.Entry, field string, clearClipboardD
 		return nil, fmt.Errorf("ERROR: Cannot copy to clipboard. Failed to get field '%s' for Entry '%s'\n", field, entry.UUID)
 	}
 	return copyToClipboard(value.Inner, clearClipboardDelay), nil
+}
+
+func clearClipboard() {
+	clipboard.Write(clipboard.FmtText, []byte(""))
 }
