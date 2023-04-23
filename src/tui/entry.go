@@ -18,6 +18,15 @@ var defaultEntryFields []entryField = []entryField{
 	{"Password", "Password", ""},
 }
 
+func isDefaultEntryField(key string) bool {
+	for _, field := range defaultEntryFields {
+		if field.key == key {
+			return true
+		}
+	}
+	return false
+}
+
 type entryTable struct {
 	model         table.Model
 	stylesFocused table.Styles
@@ -96,7 +105,10 @@ func (t entryTable) Update(msg tea.Msg) (entryTable, tea.Cmd) {
 		case "h", "esc":
 			return t, func() tea.Msg { return leaveEntryEditor{} }
 		case "y":
-			cmd = t.copyToClipboard()
+			cmd = t.copyFocusedToClipboard()
+			return t, cmd
+		case "d":
+			cmd = t.deleteFocused()
 			return t, cmd
 		}
 	}
@@ -123,8 +135,8 @@ func (t *entryTable) Focused() bool {
 	return t.model.Focused()
 }
 
-// copyToClipboard copies the value of the currently focused field to the clipboard
-func (t *entryTable) copyToClipboard() tea.Cmd {
+// copyFocusedToClipboard copies the value of the currently focused field to the clipboard
+func (t *entryTable) copyFocusedToClipboard() tea.Cmd {
 	// We have to get the key by indexing the table rows,
 	// since the display order of strings may be different
 	// from the order in t.entry.Strings
@@ -136,13 +148,33 @@ func (t *entryTable) copyToClipboard() tea.Cmd {
 		return nil
 	}
 
-	// TODO: Set status message
-
 	clipboardDelay := 0
 	if value.Protected {
 		clipboardDelay = CLEAR_CLIPBOARD_DELAY
 	}
 	return copyToClipboard(value.Inner, clipboardDelay)
+}
+
+func (t *entryTable) deleteFocused() tea.Cmd {
+	focusedKey := t.fieldKeys[t.model.Cursor()]
+	if isDefaultEntryField(focusedKey) {
+		return nil
+	}
+
+	newStrings := make([]parser.String, 0, len(t.entry.Strings))
+	for _, string := range t.entry.Strings {
+		if string.Key != focusedKey {
+			newStrings = append(newStrings, string)
+		}
+	}
+	newEntry := t.entry
+	newEntry.Strings = newStrings
+
+	if t.model.Cursor() >= len(newStrings) {
+		t.model.SetCursor(len(newStrings) - 1)
+	}
+
+	return func() tea.Msg { return updateEntryMsg{newEntry} }
 }
 
 // truncateHeader removes the header of a bubbles table by

@@ -377,6 +377,9 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
 	case loadFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
+	case updateEntryMsg:
+		n.database.Parsed().UpdateEntry(msg.newEntry)
+		n.updatePreview()
 	case leaveEntryEditor:
 		n.selector.Focus()
 		n.entryPreview.Blur()
