@@ -67,6 +67,8 @@ func (e *Entry) TryGet(key, fallback string) string {
 	return result.Inner
 }
 
+type PathNotFound error
+
 // GetItem returns a group or an item specified by a path of UUIDs. The document is traversed,
 // at each level choosing the group with UUID at the current index, until the end of the path is reached.
 // The last UUID may be that of an item.
@@ -125,5 +127,3 @@ func (d *Document) GetBinary(id int) ([]byte, error) {
 	}
 	return []byte{}, fmt.Errorf("No binary with ID: %d", id)
 }
-
-type PathNotFound error
