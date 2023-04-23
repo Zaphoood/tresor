@@ -39,6 +39,21 @@ func (g *Group) Get(uuid string) (Item, error) {
 	return nil, fmt.Errorf("Group '%s' has no item with UUID '%s'", g.Name, uuid)
 }
 
+func (g *Group) UpdateEntry(newEntry Entry) bool {
+	for i, entry := range g.Entries {
+		if entry.UUID == newEntry.UUID {
+			g.Entries[i] = newEntry
+			return true
+		}
+	}
+	for _, subgroup := range g.Groups {
+		if subgroup.UpdateEntry(newEntry) {
+			return true
+		}
+	}
+	return false
+}
+
 func (e Entry) GetUUID() string {
 	return e.UUID
 }
@@ -94,6 +109,15 @@ func (d *Document) GetItem(path []string) (Item, error) {
 		}
 	}
 	return current, nil
+}
+
+func (d *Document) UpdateEntry(newEntry Entry) bool {
+	for _, group := range d.Root.Groups {
+		if group.UpdateEntry(newEntry) {
+			return true
+		}
+	}
+	return false
 }
 
 // FindPath returns the path to a group with the given UUID if it exists,
