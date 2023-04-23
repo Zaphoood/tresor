@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,10 +12,9 @@ import (
 )
 
 const (
-	GROUP_PLACEH     = "(No entries)"
-	TITLE_PLACEH     = "(No title)"
-	ENCRYPTED_PLACEH = "••••••"
-	NUM_COL_WIDTH    = 3
+	GROUP_PLACEH  = "(No entries)"
+	TITLE_PLACEH  = "(No title)"
+	NUM_COL_WIDTH = 3
 )
 
 var numberStyle lipgloss.Style = lipgloss.NewStyle().
@@ -27,12 +25,6 @@ type entryField struct {
 	key          string
 	displayName  string
 	defaultValue string
-}
-
-var defaultFields []entryField = []entryField{
-	{"Title", "Title", TITLE_PLACEH},
-	{"UserName", "Username", ""},
-	{"Password", "Password", ""},
 }
 
 type groupTable struct {
@@ -87,11 +79,11 @@ func (t *groupTable) Clear() {
 	t.model.SetStyles(t.stylesEmpty)
 }
 
-func (t *groupTable) Init() tea.Cmd {
-	return nil
-}
-
 func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
+	if !t.Focused() {
+		return t, nil
+	}
+
 	var cmd tea.Cmd
 	oldCursor := t.model.Cursor()
 	t.model, cmd = t.model.Update(msg)
@@ -103,6 +95,18 @@ func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
 
 func (t *groupTable) View() string {
 	return truncateHeader(t.model.View())
+}
+
+func (t *groupTable) Focus() {
+	t.model.Focus()
+}
+
+func (t *groupTable) Blur() {
+	t.model.Blur()
+}
+
+func (t *groupTable) Focused() bool {
+	return t.model.Focused()
 }
 
 func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
@@ -201,86 +205,18 @@ func (t *groupTable) FocusedUUID() string {
 	return t.items[t.model.Cursor()].GetUUID()
 }
 
-func (t *groupTable) SetFocusToUUID(uuid string) error {
+func (t *groupTable) SetCursorToUUID(uuid string) (tea.Cmd, error) {
 	if len(t.items) == 0 {
-		return fmt.Errorf("Failed set cursor to UUID %s: Group is empty", uuid)
+		return nil, fmt.Errorf("Failed set cursor to UUID %s: Group is empty", uuid)
 	}
 	for i, item := range t.items {
 		if uuid == item.GetUUID() {
+			if i == t.model.Cursor() {
+				return nil, nil
+			}
 			t.model.SetCursor(i)
-			return nil
+			return func() tea.Msg { return groupTableCursorChanged{} }, nil
 		}
 	}
-	return fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
-}
-
-type entryTable struct {
-	model  table.Model
-	styles table.Styles
-}
-
-func newEntryTable(styles table.Styles, options ...table.Option) entryTable {
-	return entryTable{
-		model:  table.New(append(options, table.WithStyles(styles))...),
-		styles: styles,
-	}
-}
-
-func (t *entryTable) Resize(width, height int) {
-	t.model.SetWidth(width)
-	t.model.SetHeight(height)
-	frameWidth, _ := t.styles.Header.GetFrameSize()
-	firstColWidth := (width - frameWidth) * 4 / 10
-	secondColWidth := width - firstColWidth - 2*frameWidth
-	newColumns := []table.Column{
-		// These Titles don't matter, since table headers will be truncated anyway
-		{Title: "Key", Width: firstColWidth},
-		{Title: "Value", Width: secondColWidth},
-	}
-
-	t.model.SetColumns(newColumns)
-}
-
-func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
-	rows := make([]table.Row, 0, len(entry.Strings))
-	visited := make(map[string]struct{})
-	var value string
-	for _, field := range defaultFields {
-		r, err := entry.Get(field.key)
-		if err != nil {
-			value = field.defaultValue
-		} else if r.Protected {
-			value = ENCRYPTED_PLACEH
-		} else {
-			value = r.Inner
-		}
-		rows = append(rows, table.Row{field.displayName, value})
-		visited[field.key] = struct{}{}
-	}
-	for _, field := range entry.Strings {
-		if _, skip := visited[field.Key]; skip {
-			continue
-		}
-		if field.Value.Protected {
-			value = ENCRYPTED_PLACEH
-		} else {
-			value = field.Value.Inner
-		}
-		rows = append(rows, table.Row{field.Key, value})
-	}
-	t.model.SetRows(rows)
-}
-
-func (t entryTable) View() string {
-	return truncateHeader(t.model.View())
-}
-
-// truncateHeader removes the header of a bubbles table by
-// deleting everything up to (and including) the first newline
-func truncateHeader(s string) string {
-	split := strings.SplitN(s, "\n", 2)
-	if len(split) < 2 {
-		return split[0]
-	}
-	return split[1]
+	return nil, fmt.Errorf("Failed to set cursor to UUID %s: Not found", uuid)
 }

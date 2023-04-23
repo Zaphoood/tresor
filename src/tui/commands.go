@@ -135,3 +135,9 @@ type globalResizeMsg struct {
 }
 
 type groupTableCursorChanged struct{}
+
+type leaveEntryEditor struct{}
+
+type setCommandLineMessageMsg struct {
+	msg string
+}

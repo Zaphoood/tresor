@@ -11,12 +11,9 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"golang.design/x/clipboard"
 )
 
 /* Model for navigating the Database in order to view and edit entries */
-
-const CLEAR_CLIPBOARD_DELAY = 10
 
 const TABLE_SPACING = 1
 
@@ -27,12 +24,12 @@ type Navigate struct {
 	selector     groupTable
 	groupPreview groupTable
 	entryPreview entryTable
-	focusedItem  parser.Item
 	lastCursor   map[string]string
 	cmdLine      CommandLine
 
-	search      []string
-	searchIndex int
+	search        []string
+	searchIndex   int
+	searchForward bool
 
 	path []string
 	err  error
@@ -44,13 +41,18 @@ type Navigate struct {
 }
 
 func NewNavigate(database *database.Database, windowWidth, windowHeight int) Navigate {
-	styles := table.Styles{
+	tableStyles := table.Styles{
 		Header: lipgloss.NewStyle().Bold(true),
 		Cell:   lipgloss.NewStyle(),
 		Selected: lipgloss.NewStyle().
 			Reverse(true).
 			Bold(true).
 			Foreground(lipgloss.Color("#9dcbf4")),
+	}
+	tableStylesBlurred := table.Styles{
+		Header:   tableStyles.Header.Copy(),
+		Cell:     tableStyles.Cell.Copy(),
+		Selected: lipgloss.NewStyle(),
 	}
 	n := Navigate{
 		path:         []string{},
@@ -60,24 +62,19 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		database:     database,
 	}
 	n.cmdLine = NewCommandLine()
-	n.parent = newGroupTable(styles, true, false)
-	n.selector = newGroupTable(styles, true, true, table.WithFocused(true))
-	n.groupPreview = newGroupTable(styles, true, false)
-	n.entryPreview = newEntryTable(table.Styles{
-		Header:   styles.Header.Copy(),
-		Cell:     styles.Cell.Copy(),
-		Selected: lipgloss.NewStyle(),
-	})
+	n.parent = newGroupTable(tableStyles, true, false)
+	n.selector = newGroupTable(tableStyles, true, true, table.WithFocused(true))
+	n.groupPreview = newGroupTable(tableStyles, true, false)
+	n.entryPreview = newEntryTable(
+		tableStyles,
+		tableStylesBlurred,
+	)
 
 	n.resizeAll()
 	n.loadLastSelected()
 	n.updateAll()
 
-	err := clipboard.Init()
-	if err != nil {
-		// TODO: We should handle this more gracefully
-		panic(err)
-	}
+	initClipboard()
 
 	return n
 }
@@ -132,28 +129,34 @@ func (n *Navigate) saveLastSelected() {
 	n.database.Parsed().Meta.LastSelectedGroup = currentGroupUUID
 }
 
-func (n *Navigate) updatePreview() {
+// getFocusedItem returns the currently focused database item if it exists, otherwise nil
+func (n *Navigate) getFocusedItem() *parser.Item {
 	focused := n.focusedUUID()
 	if len(focused) == 0 {
-		n.groupPreview.Clear()
-		return
+		return nil
 	}
 	item, err := n.database.Parsed().GetItem(append(n.path, focused))
 	if err != nil {
-		log.Printf("ERROR: %s\n", err)
-		n.groupPreview.Clear()
+		log.Printf("ERROR: Failed to get focused item: %s\n", err)
+		return nil
+	}
+	return &item
+}
+
+func (n *Navigate) updatePreview() {
+	focusedItem := n.getFocusedItem()
+	if focusedItem == nil {
 		return
 	}
-	switch item := item.(type) {
+	switch focusedItem := (*focusedItem).(type) {
 	case parser.Group:
-		n.groupPreview.LoadGroup(item, &n.lastCursor)
+		n.groupPreview.LoadGroup(focusedItem, &n.lastCursor)
 	case parser.Entry:
-		n.entryPreview.LoadEntry(item, n.database)
+		n.entryPreview.LoadEntry(focusedItem, n.database)
 	default:
 		log.Printf("ERROR in updatePreview: Expected Group or Entry from GetItem()")
 		return
 	}
-	n.focusedItem = item
 }
 
 func (n *Navigate) moveLeft() {
@@ -166,16 +169,21 @@ func (n *Navigate) moveLeft() {
 }
 
 func (n *Navigate) moveRight() {
-	selected, err := n.database.Parsed().GetItem(append(n.path, n.focusedUUID()))
+	newPath := append(n.path, n.focusedUUID())
+	focusedItem, err := n.database.Parsed().GetItem(newPath)
 	if err != nil {
 		return
 	}
-	if _, ok := selected.(parser.Group); !ok {
-		return
+
+	switch focusedItem.(type) {
+	case parser.Group:
+		n.rememberSelected()
+		n.path = newPath
+		n.updateAll()
+	case parser.Entry:
+		n.selector.Blur()
+		n.entryPreview.Focus()
 	}
-	n.rememberSelected()
-	n.path = append(n.path, n.focusedUUID())
-	n.updateAll()
 }
 
 func (n *Navigate) rememberSelected() {
@@ -189,19 +197,22 @@ func (n Navigate) focusedUUID() string {
 }
 
 func (n *Navigate) copyToClipboard() tea.Cmd {
-	focusedEntry, ok := n.focusedItem.(parser.Entry)
+	focusedItem := n.getFocusedItem()
+	if focusedItem == nil {
+		return nil
+	}
+
+	focusedEntry, ok := (*focusedItem).(parser.Entry)
 	if !ok {
 		return nil
 	}
-	unlocked, err := focusedEntry.Get("Password")
+
+	cmd, err := copyEntryFieldToClipboard(focusedEntry, "Password", CLEAR_CLIPBOARD_DELAY)
 	if err != nil {
-		log.Printf("Failed to get Password for '%s'\n", focusedEntry.UUID)
+		log.Println(err)
 		return nil
 	}
-	notifyChange := clipboard.Write(clipboard.FmtText, []byte(unlocked.Inner))
-	n.cmdLine.SetMessage(fmt.Sprintf("Copied to clipboard. (Clearing in %d seconds)", CLEAR_CLIPBOARD_DELAY))
-
-	return scheduleClearClipboard(CLEAR_CLIPBOARD_DELAY, notifyChange)
+	return cmd
 }
 
 func (n *Navigate) handleCommand(cmd []string) tea.Cmd {
@@ -263,8 +274,8 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 	return fileSelectedCmd(path)
 }
 
-func (n *Navigate) handleSearch(query string, reverse bool) {
-	search := n.selector.FindAll(func(item parser.Item) bool {
+func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
+	n.search = n.selector.FindAll(func(item parser.Item) bool {
 		switch item := item.(type) {
 		case parser.Group:
 			return strings.Contains(strings.ToLower(item.Name), strings.ToLower(query))
@@ -273,39 +284,70 @@ func (n *Navigate) handleSearch(query string, reverse bool) {
 		}
 		return false
 	})
-	if len(search) == 0 {
+	if len(n.search) == 0 {
 		n.cmdLine.SetMessage(fmt.Sprintf("Not found: %s", query))
+		return nil
 	}
+	n.searchForward = !reverse
 	if reverse {
-		n.search = make([]string, len(search))
-		for i := len(search) - 1; i >= 0; i-- {
-			n.search[len(search)-1-i] = search[i]
-		}
+		n.searchIndex = len(n.search) - 1
 	} else {
-		n.search = search
+		n.searchIndex = 0
 	}
-	n.searchIndex = 0
-	n.selector.SetFocusToUUID(n.search[0])
+
+	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return cmd
 }
 
 func (n *Navigate) nextSearchResult() {
-	if len(n.search) == 0 {
-		return
+	if n.searchForward {
+		n.incSearchIndex()
+	} else {
+		n.decSearchIndex()
 	}
-	n.searchIndex = (n.searchIndex + 1) % len(n.search)
-	n.selector.SetFocusToUUID(n.search[n.searchIndex])
 }
 
 func (n *Navigate) previousSearchResult() {
-	if len(n.search) == 0 {
-		return
+	if n.searchForward {
+		n.decSearchIndex()
+	} else {
+		n.incSearchIndex()
 	}
-	n.searchIndex = (n.searchIndex + len(n.search) - 1) % len(n.search)
-	n.selector.SetFocusToUUID(n.search[n.searchIndex])
 }
 
-func clearClipboard() {
-	clipboard.Write(clipboard.FmtText, []byte(""))
+func (n *Navigate) incSearchIndex() tea.Cmd {
+	if len(n.search) == 0 {
+		return nil
+	}
+	n.searchIndex = (n.searchIndex + 1) % len(n.search)
+
+	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return cmd
+}
+
+func (n *Navigate) decSearchIndex() tea.Cmd {
+	if len(n.search) == 0 {
+		return nil
+	}
+	n.searchIndex = (n.searchIndex + len(n.search) - 1) % len(n.search)
+
+	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return cmd
 }
 
 func (n Navigate) Init() tea.Cmd {
@@ -326,7 +368,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandInputMsg:
 		cmds = append(cmds, n.handleCommand(msg.cmd))
 	case searchInputMsg:
-		n.handleSearch(msg.query, msg.reverse)
+		cmds = append(cmds, n.handleSearch(msg.query, msg.reverse))
 	case saveDoneMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Saved to %s", msg.path))
 		cmds = append(cmds, msg.andThen)
@@ -334,47 +376,65 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
 	case loadFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
+	case leaveEntryEditor:
+		n.selector.Focus()
+		n.entryPreview.Blur()
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
 		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		if !n.cmdLine.IsInputActive() {
-			switch msg.String() {
-			case "ctrl+c":
+		if !n.cmdLine.Focused() {
+			if msg.String() == "ctrl+c" {
 				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
-			case "y":
-				cmd := n.copyToClipboard()
-				return n, cmd
-			case "l":
-				n.moveRight()
-			case "h":
-				n.moveLeft()
-			case "n":
-				n.nextSearchResult()
-			case "N":
-				n.previousSearchResult()
+			}
+			if !n.entryPreview.Focused() {
+				cmds = append(cmds, n.handleKeySelector(msg))
 			}
 		}
-		n.cmdLine, cmd = n.cmdLine.Update(msg)
-		cmds = append(cmds, cmd)
 	}
-	if !n.cmdLine.IsInputActive() {
+	n.cmdLine, cmd = n.cmdLine.Update(msg)
+	cmds = append(cmds, cmd)
+
+	if !n.cmdLine.Focused() {
 		n.selector, cmd = n.selector.Update(msg)
+		cmds = append(cmds, cmd)
+		n.entryPreview, cmd = n.entryPreview.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
 	return n, tea.Batch(cmds...)
 }
 
+// handleKeySelector handles key events for the selector table
+func (n *Navigate) handleKeySelector(msg tea.KeyMsg) tea.Cmd {
+	// TODO: Maybe this should be a method of groupTable
+	switch msg.String() {
+	case "y":
+		return n.copyToClipboard()
+	case "l":
+		n.moveRight()
+	case "h":
+		n.moveLeft()
+	case "n":
+		n.nextSearchResult()
+	case "N":
+		n.previousSearchResult()
+	}
+	return nil
+}
+
 func (n Navigate) View() string {
-	var preview string
-	switch n.focusedItem.(type) {
-	case parser.Group:
-		preview = n.groupPreview.View()
-	case parser.Entry:
-		preview = n.entryPreview.View()
+	preview := ""
+	focusedItem := n.getFocusedItem()
+	if focusedItem != nil {
+		switch (*focusedItem).(type) {
+		case parser.Group:
+			preview = n.groupPreview.View()
+		case parser.Entry:
+			preview = n.entryPreview.View()
+		}
 	}
 	tables := lipgloss.JoinHorizontal(
 		lipgloss.Top,

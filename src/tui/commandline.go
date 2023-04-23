@@ -3,7 +3,6 @@ package tui
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -45,15 +44,20 @@ func (c CommandLine) Init() tea.Cmd {
 
 func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	var cmd tea.Cmd
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	switch msg := msg.(type) {
+	case setCommandLineMessageMsg:
+		// TODO: Consider calling it the command line's 'status' instead in order to avoid these unfortunate variable names
+		c.SetMessage(msg.msg)
+		return c, nil
+	case tea.KeyMsg:
 		if c.inputMode == inputNone {
 			switch msg.String() {
 			case PROMPT_COMMAND:
-				c.startInput(inputCommand, PROMPT_COMMAND)
+				return c, c.startInput(inputCommand, PROMPT_COMMAND)
 			case PROMPT_SEARCH:
-				c.startInput(inputSearch, PROMPT_SEARCH)
+				return c, c.startInput(inputSearch, PROMPT_SEARCH)
 			case PROMPT_REV_SEARCH:
-				c.startInput(inputSearch, PROMPT_REV_SEARCH)
+				return c, c.startInput(inputSearch, PROMPT_REV_SEARCH)
 			}
 			return c, nil
 		}
@@ -76,15 +80,14 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	return c, nil
 }
 
-func (c *CommandLine) startInput(mode inputMode, prompt string) {
+func (c *CommandLine) startInput(mode inputMode, prompt string) tea.Cmd {
 	c.inputMode = mode
-	c.input.Focus()
 	c.input.SetValue("")
 	c.input.Prompt = prompt
+	return c.input.Focus()
 }
 
 func (c *CommandLine) endInput() {
-	log.Println("foo")
 	c.inputMode = inputNone
 	c.input.Blur()
 	c.message = DEFAULT_MESSAGE
@@ -168,7 +171,7 @@ func (c *CommandLine) SetMessage(msg string) {
 	c.message = msg
 }
 
-func (c CommandLine) IsInputActive() bool {
+func (c CommandLine) Focused() bool {
 	return c.inputMode != inputNone
 }
 
