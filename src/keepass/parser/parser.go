@@ -238,11 +238,6 @@ func Unparse(d *Document, key [32]byte) ([]byte, error) {
 	return out, nil
 }
 
-type field struct {
-	key   string
-	value string
-}
-
 // GetItem returns a group or an item specified by a path of UUIDs. The document is traversed,
 // at each level choosing the group with UUID at the current index, until the end of the path is reached.
 // The last UUID may be that of an item.
@@ -270,7 +265,7 @@ func (d *Document) GetItem(path []string) (Item, error) {
 	return current, nil
 }
 
-// FindPath returns the relative path to a subgroup with the given UUID if it exists,
+// FindPath returns the path to a group with the given UUID if it exists,
 // and a bool indicating wether the UUID was found.
 func (d *Document) FindPath(uuid string) ([]string, bool) {
 	return findPathInGroups(uuid, d.Root.Groups)
