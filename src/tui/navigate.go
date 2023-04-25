@@ -356,7 +356,6 @@ func (n Navigate) Init() tea.Cmd {
 
 func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case clearClipboardMsg:
 		clearClipboard()
@@ -366,12 +365,14 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case groupTableCursorChanged:
 		n.updatePreview()
 	case commandInputMsg:
-		cmds = append(cmds, n.handleCommand(msg.cmd))
+		cmd = n.handleCommand(msg.cmd)
+		return n, cmd
 	case searchInputMsg:
-		cmds = append(cmds, n.handleSearch(msg.query, msg.reverse))
+		cmd = n.handleSearch(msg.query, msg.reverse)
+		return n, cmd
 	case saveDoneMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Saved to %s", msg.path))
-		cmds = append(cmds, msg.andThen)
+		return n, msg.andThen
 	case saveFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
 	case loadFailedMsg:
@@ -385,39 +386,48 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.resizeAll()
 		return n, globalResizeCmd(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		if !n.cmdLine.Focused() {
-			if msg.String() == "ctrl+c" {
-				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
-				return n, nil
-			}
-			handled, cmd := n.handleKeyCmdLineTrigger(msg)
-			if handled {
-				return n, cmd
-			}
-			handled, cmd = n.handleKey(msg)
-			if handled {
-				return n, cmd
-			}
+		if n.cmdLine.Focused() {
+			// Key events should not be handled by Navigate in case the command line is active
+			break
+		}
+
+		if handled, cmd := n.handleCtrlC(msg); handled {
+			return n, cmd
+		}
+		if handled, cmd := n.handleKeyCmdLineTrigger(msg); handled {
+			return n, cmd
+		}
+		if handled, cmd := n.handleKeyDefault(msg); handled {
+			return n, cmd
 		}
 	}
+
 	if n.cmdLine.Focused() {
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
-		cmds = append(cmds, cmd)
+		return n, cmd
 	} else if n.entryPreview.Focused() {
 		n.entryPreview, cmd = n.entryPreview.Update(msg)
-		cmds = append(cmds, cmd)
+		return n, cmd
 	} else {
 		n.selector, cmd = n.selector.Update(msg)
-		cmds = append(cmds, cmd)
+		return n, cmd
 	}
-
-	return n, tea.Batch(cmds...)
 }
 
-func (n *Navigate) handleKey(msg tea.KeyMsg) (bool, tea.Cmd) {
+func (n *Navigate) handleCtrlC(msg tea.KeyMsg) (bool, tea.Cmd) {
+	if msg.String() == "ctrl+c" {
+		n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
+		return true, nil
+	}
+	return false, nil
+}
+
+// handleKeyDefault handles key events when no other components are focused (such as command line, entry preview)
+func (n *Navigate) handleKeyDefault(msg tea.KeyMsg) (bool, tea.Cmd) {
 	if n.entryPreview.Focused() {
 		return false, nil
 	}
+
 	switch msg.String() {
 	case "y":
 		return true, n.copyToClipboard()
