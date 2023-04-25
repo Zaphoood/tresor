@@ -388,41 +388,65 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !n.cmdLine.Focused() {
 			if msg.String() == "ctrl+c" {
 				n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
+				return n, nil
 			}
-			if !n.entryPreview.Focused() {
-				cmds = append(cmds, n.handleKeySelector(msg))
+			handled, cmd := n.handleKeyCmdLineTrigger(msg)
+			if handled {
+				return n, cmd
+			}
+			handled, cmd = n.handleKey(msg)
+			if handled {
+				return n, cmd
 			}
 		}
 	}
-	n.cmdLine, cmd = n.cmdLine.Update(msg)
-	cmds = append(cmds, cmd)
-
-	if !n.cmdLine.Focused() {
-		n.selector, cmd = n.selector.Update(msg)
+	if n.cmdLine.Focused() {
+		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		cmds = append(cmds, cmd)
+	} else if n.entryPreview.Focused() {
 		n.entryPreview, cmd = n.entryPreview.Update(msg)
+		cmds = append(cmds, cmd)
+	} else {
+		n.selector, cmd = n.selector.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
 	return n, tea.Batch(cmds...)
 }
 
-// handleKeySelector handles key events for the selector table
-func (n *Navigate) handleKeySelector(msg tea.KeyMsg) tea.Cmd {
-	// TODO: Maybe this should be a method of groupTable
+func (n *Navigate) handleKey(msg tea.KeyMsg) (bool, tea.Cmd) {
+	if n.entryPreview.Focused() {
+		return false, nil
+	}
 	switch msg.String() {
 	case "y":
-		return n.copyToClipboard()
+		return true, n.copyToClipboard()
 	case "l":
 		n.moveRight()
+		return true, nil
 	case "h":
 		n.moveLeft()
+		return true, nil
 	case "n":
 		n.nextSearchResult()
+		return true, nil
 	case "N":
 		n.previousSearchResult()
+		return true, nil
 	}
-	return nil
+	return false, nil
+}
+
+func (n *Navigate) handleKeyCmdLineTrigger(msg tea.KeyMsg) (bool, tea.Cmd) {
+	switch msg.String() {
+	case PROMPT_COMMAND:
+		return true, n.cmdLine.StartInput(InputCommand, PROMPT_COMMAND)
+	case PROMPT_SEARCH:
+		return true, n.cmdLine.StartInput(InputSearch, PROMPT_SEARCH)
+	case PROMPT_REV_SEARCH:
+		return true, n.cmdLine.StartInput(InputSearch, PROMPT_REV_SEARCH)
+	}
+	return false, nil
 }
 
 func (n Navigate) View() string {

@@ -17,9 +17,9 @@ const PROMPT_REV_SEARCH = "?"
 type inputMode int
 
 const (
-	inputNone inputMode = iota
-	inputCommand
-	inputSearch
+	InputNone inputMode = iota
+	InputCommand
+	InputSearch
 )
 
 type CommandLine struct {
@@ -33,7 +33,7 @@ func NewCommandLine() CommandLine {
 	input.Prompt = ""
 	return CommandLine{
 		input:     input,
-		inputMode: inputNone,
+		inputMode: InputNone,
 		message:   DEFAULT_MESSAGE,
 	}
 }
@@ -43,6 +43,10 @@ func (c CommandLine) Init() tea.Cmd {
 }
 
 func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
+	if !c.Focused() {
+		return c, nil
+	}
+
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case setCommandLineMessageMsg:
@@ -50,18 +54,6 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 		c.SetMessage(msg.msg)
 		return c, nil
 	case tea.KeyMsg:
-		if c.inputMode == inputNone {
-			switch msg.String() {
-			case PROMPT_COMMAND:
-				return c, c.startInput(inputCommand, PROMPT_COMMAND)
-			case PROMPT_SEARCH:
-				return c, c.startInput(inputSearch, PROMPT_SEARCH)
-			case PROMPT_REV_SEARCH:
-				return c, c.startInput(inputSearch, PROMPT_REV_SEARCH)
-			}
-			return c, nil
-		}
-
 		switch msg.String() {
 		case "esc", "ctrl+c":
 			c.endInput()
@@ -80,7 +72,7 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	return c, nil
 }
 
-func (c *CommandLine) startInput(mode inputMode, prompt string) tea.Cmd {
+func (c *CommandLine) StartInput(mode inputMode, prompt string) tea.Cmd {
 	c.inputMode = mode
 	c.input.SetValue("")
 	c.input.Prompt = prompt
@@ -88,13 +80,13 @@ func (c *CommandLine) startInput(mode inputMode, prompt string) tea.Cmd {
 }
 
 func (c *CommandLine) endInput() {
-	c.inputMode = inputNone
+	c.inputMode = InputNone
 	c.input.Blur()
 	c.message = DEFAULT_MESSAGE
 }
 
 func (c *CommandLine) onEnter() tea.Cmd {
-	if c.inputMode == inputNone {
+	if c.inputMode == InputNone {
 		return nil
 	}
 	inputMode := c.inputMode
@@ -102,9 +94,9 @@ func (c *CommandLine) onEnter() tea.Cmd {
 	c.message = c.input.Prompt + c.input.Value()
 
 	switch inputMode {
-	case inputCommand:
+	case InputCommand:
 		return c.onCommandInput()
-	case inputSearch:
+	case InputSearch:
 		return c.onSearchInput()
 	}
 	return nil
@@ -158,9 +150,9 @@ func parseInputAsSearch(input string) (string, error) {
 
 func (c CommandLine) View() string {
 	switch c.inputMode {
-	case inputNone:
+	case InputNone:
 		return c.message
-	case inputCommand, inputSearch:
+	case InputCommand, InputSearch:
 		return c.input.View()
 	default:
 		panic(fmt.Sprintf("ERROR: Invalid input mode %d", c.inputMode))
@@ -172,7 +164,7 @@ func (c *CommandLine) SetMessage(msg string) {
 }
 
 func (c CommandLine) Focused() bool {
-	return c.inputMode != inputNone
+	return c.inputMode != InputNone
 }
 
 func (c CommandLine) GetHeight() int {
