@@ -82,6 +82,16 @@ func (e *Entry) TryGet(key, fallback string) string {
 	return result.Inner
 }
 
+func (e *Entry) DeleteField(key string) {
+	newStrings := make([]String, 0, len(e.Strings))
+	for _, string := range e.Strings {
+		if string.Key != key {
+			newStrings = append(newStrings, string)
+		}
+	}
+	e.Strings = newStrings
+}
+
 type PathNotFound error
 
 // GetItem returns a group or an item specified by a path of UUIDs. The document is traversed,

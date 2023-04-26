@@ -161,20 +161,13 @@ func (t *entryTable) deleteFocused() tea.Cmd {
 		return nil
 	}
 
-	newStrings := make([]parser.String, 0, len(t.entry.Strings))
-	for _, string := range t.entry.Strings {
-		if string.Key != focusedKey {
-			newStrings = append(newStrings, string)
-		}
-	}
-	newEntry := t.entry
-	newEntry.Strings = newStrings
+	t.entry.DeleteField(focusedKey)
 
-	if t.model.Cursor() >= len(newStrings) {
-		t.model.SetCursor(len(newStrings) - 1)
+	if t.model.Cursor() >= len(t.entry.Strings) {
+		t.model.SetCursor(len(t.entry.Strings) - 1)
 	}
 
-	return func() tea.Msg { return updateEntryMsg{newEntry} }
+	return func() tea.Msg { return updateEntryMsg{t.entry} }
 }
 
 // truncateHeader removes the header of a bubbles table by
