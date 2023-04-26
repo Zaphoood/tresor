@@ -9,7 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const DEFAULT_MESSAGE = "Ready."
+const INITIAL_MESSAGE = "Ready."
 const PROMPT_COMMAND = ":"
 const PROMPT_SEARCH = "/"
 const PROMPT_REV_SEARCH = "?"
@@ -27,7 +27,7 @@ func NewCommandLine() CommandLine {
 	input.Prompt = ""
 	return CommandLine{
 		input:    input,
-		message:  DEFAULT_MESSAGE,
+		message:  INITIAL_MESSAGE,
 		callback: nil,
 	}
 }
@@ -75,8 +75,7 @@ func (c *CommandLine) StartInput(prompt string, callback CmdLineInputCallback) t
 
 func (c *CommandLine) endInput() {
 	c.input.Blur()
-	// TODO: Reconsider this default message thing (vim doesn't do it, so why should we?)
-	c.message = DEFAULT_MESSAGE
+	c.message = ""
 }
 
 func (c *CommandLine) onEnter() tea.Cmd {
@@ -84,7 +83,7 @@ func (c *CommandLine) onEnter() tea.Cmd {
 		return nil
 	}
 	c.endInput()
-	c.message = c.input.Prompt + c.input.Value()
+	c.SetMessage(c.input.Prompt + c.input.Value())
 
 	if c.callback == nil {
 		log.Println("ERROR: No callback set in CommandLine.onEnter()")
