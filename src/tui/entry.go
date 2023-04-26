@@ -71,7 +71,11 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		if err != nil {
 			value = field.defaultValue
 		} else if r.Protected {
-			value = ENCRYPTED_PLACEH
+			if r.Inner == "" {
+				value = ""
+			} else {
+				value = ENCRYPTED_PLACEH
+			}
 		} else {
 			value = r.Inner
 		}
@@ -84,7 +88,11 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 			continue
 		}
 		if field.Value.Protected {
-			value = ENCRYPTED_PLACEH
+			if field.Value.Inner == "" {
+				value = ""
+			} else {
+				value = ENCRYPTED_PLACEH
+			}
 		} else {
 			value = field.Value.Inner
 		}
