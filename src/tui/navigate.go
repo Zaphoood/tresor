@@ -460,9 +460,11 @@ func (n *Navigate) handleKeyCmdLineTrigger(msg tea.KeyMsg) (bool, tea.Cmd) {
 }
 
 func (n Navigate) View() string {
-	preview := ""
+	var preview string
 	focusedItem := n.getFocusedItem()
-	if focusedItem != nil {
+	if focusedItem == nil {
+		preview = ""
+	} else {
 		switch (*focusedItem).(type) {
 		case parser.Group:
 			preview = n.groupPreview.View()
