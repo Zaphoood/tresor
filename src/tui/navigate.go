@@ -450,11 +450,11 @@ func (n *Navigate) handleKeyDefault(msg tea.KeyMsg) (bool, tea.Cmd) {
 func (n *Navigate) handleKeyCmdLineTrigger(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case PROMPT_COMMAND:
-		return true, n.cmdLine.StartInput(InputCommand, PROMPT_COMMAND)
+		return true, n.cmdLine.StartInput(PROMPT_COMMAND, CommandCallback)
 	case PROMPT_SEARCH:
-		return true, n.cmdLine.StartInput(InputSearch, PROMPT_SEARCH)
+		return true, n.cmdLine.StartInput(PROMPT_SEARCH, SearchCallback(false))
 	case PROMPT_REV_SEARCH:
-		return true, n.cmdLine.StartInput(InputSearch, PROMPT_REV_SEARCH)
+		return true, n.cmdLine.StartInput(PROMPT_REV_SEARCH, SearchCallback(true))
 	}
 	return false, nil
 }

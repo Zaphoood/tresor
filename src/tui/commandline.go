@@ -2,7 +2,7 @@ package tui
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -14,29 +14,21 @@ const PROMPT_COMMAND = ":"
 const PROMPT_SEARCH = "/"
 const PROMPT_REV_SEARCH = "?"
 
-type inputMode int
-
-const (
-	InputNone inputMode = iota
-	InputCommand
-	InputSearch
-)
-
 type CmdLineInputCallback func(string) tea.Cmd
 
 type CommandLine struct {
-	input     textinput.Model
-	inputMode inputMode
-	message   string
+	input    textinput.Model
+	message  string
+	callback CmdLineInputCallback
 }
 
 func NewCommandLine() CommandLine {
 	input := textinput.New()
 	input.Prompt = ""
 	return CommandLine{
-		input:     input,
-		inputMode: InputNone,
-		message:   DEFAULT_MESSAGE,
+		input:    input,
+		message:  DEFAULT_MESSAGE,
+		callback: nil,
 	}
 }
 
@@ -74,38 +66,71 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	return c, nil
 }
 
-func (c *CommandLine) StartInput(mode inputMode, prompt string) tea.Cmd {
-	c.inputMode = mode
+func (c *CommandLine) StartInput(prompt string, callback CmdLineInputCallback) tea.Cmd {
 	c.input.SetValue("")
+	c.callback = callback
 	c.input.Prompt = prompt
 	return c.input.Focus()
 }
 
 func (c *CommandLine) endInput() {
-	c.inputMode = InputNone
 	c.input.Blur()
+	// TODO: Reconsider this default message thing (vim doesn't do it, so why should we?)
 	c.message = DEFAULT_MESSAGE
 }
 
 func (c *CommandLine) onEnter() tea.Cmd {
-	if c.inputMode == InputNone {
+	if !c.input.Focused() {
 		return nil
 	}
-	inputMode := c.inputMode
 	c.endInput()
 	c.message = c.input.Prompt + c.input.Value()
 
-	switch inputMode {
-	case InputCommand:
-		return commandCallback(c.input.Value())
-	case InputSearch:
-		// TODO: Remove hard-coded reverse=false
-		return searchCallback(false)(c.input.Value())
+	if c.callback == nil {
+		log.Println("ERROR: No callback set in CommandLine.onEnter()")
+		return nil
 	}
-	return nil
+
+	return c.callback(c.input.Value())
 }
 
-func commandCallback(s string) tea.Cmd {
+func parseInputAsSearch(input string) (string, error) {
+	if len(input) == 0 {
+		return "", errors.New("Empty search")
+	}
+	return input, nil
+}
+
+func (c CommandLine) View() string {
+	if c.input.Focused() {
+		return c.input.View()
+	} else {
+		return c.message
+	}
+}
+
+func (c *CommandLine) SetMessage(msg string) {
+	c.message = msg
+}
+
+func (c CommandLine) Focused() bool {
+	return c.input.Focused()
+}
+
+func (c CommandLine) GetHeight() int {
+	return 1
+}
+
+type commandInputMsg struct {
+	cmd []string
+}
+
+type searchInputMsg struct {
+	query   string
+	reverse bool
+}
+
+func CommandCallback(s string) tea.Cmd {
 	cmdAsStrings, err := parseInputAsCommand(s)
 	if err != nil || len(cmdAsStrings) == 0 {
 		return nil
@@ -113,7 +138,7 @@ func commandCallback(s string) tea.Cmd {
 	return func() tea.Msg { return commandInputMsg{cmdAsStrings} }
 }
 
-func searchCallback(reverse bool) CmdLineInputCallback {
+func SearchCallback(reverse bool) CmdLineInputCallback {
 	return func(s string) tea.Cmd {
 		inputAsSearch, err := parseInputAsSearch(s)
 		if err != nil || len(inputAsSearch) == 0 {
@@ -135,43 +160,4 @@ func parseInputAsCommand(input string) ([]string, error) {
 		}
 	}
 	return cmd, nil
-}
-
-func parseInputAsSearch(input string) (string, error) {
-	if len(input) == 0 {
-		return "", errors.New("Empty search")
-	}
-	return input, nil
-}
-
-func (c CommandLine) View() string {
-	switch c.inputMode {
-	case InputNone:
-		return c.message
-	case InputCommand, InputSearch:
-		return c.input.View()
-	default:
-		panic(fmt.Sprintf("ERROR: Invalid input mode %d", c.inputMode))
-	}
-}
-
-func (c *CommandLine) SetMessage(msg string) {
-	c.message = msg
-}
-
-func (c CommandLine) Focused() bool {
-	return c.inputMode != InputNone
-}
-
-func (c CommandLine) GetHeight() int {
-	return 1
-}
-
-type commandInputMsg struct {
-	cmd []string
-}
-
-type searchInputMsg struct {
-	query   string
-	reverse bool
 }
