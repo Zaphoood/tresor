@@ -6,6 +6,7 @@ import (
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/util/set"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -64,7 +65,8 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	t.entry = entry
 	t.fieldKeys = make([]string, 0, len(entry.Strings))
 	rows := make([]table.Row, 0, len(entry.Strings))
-	visited := make(map[string]struct{})
+	visited := set.New[string]()
+
 	var value string
 	for _, field := range defaultEntryFields {
 		r, err := entry.Get(field.key)
@@ -81,10 +83,10 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 		}
 		rows = append(rows, table.Row{field.displayName, value})
 		t.fieldKeys = append(t.fieldKeys, field.key)
-		visited[field.key] = struct{}{}
+		visited.Insert(field.key)
 	}
 	for _, field := range entry.Strings {
-		if _, skip := visited[field.Key]; skip {
+		if visited.Contains(field.Key) {
 			continue
 		}
 		if field.Value.Protected {
