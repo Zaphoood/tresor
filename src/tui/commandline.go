@@ -53,7 +53,8 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 			c.endInput()
 			return c, nil
 		case "enter":
-			return c, c.onEnter()
+			cmd = c.onEnter()
+			return c, cmd
 		case "backspace":
 			if len(c.input.Value()) == 0 {
 				c.endInput()
