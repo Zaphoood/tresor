@@ -92,6 +92,17 @@ func (e *Entry) DeleteField(key string) {
 	e.Strings = newStrings
 }
 
+func (e *Entry) UpdateField(key, value string) {
+	newStrings := make([]String, 0, len(e.Strings))
+	for _, string := range e.Strings {
+		if string.Key == key {
+			string.Value.Inner = value
+		}
+		newStrings = append(newStrings, string)
+	}
+	e.Strings = newStrings
+}
+
 type PathNotFound error
 
 // GetItem returns a group or an item specified by a path of UUIDs. The document is traversed,

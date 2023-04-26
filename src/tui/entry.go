@@ -158,10 +158,10 @@ func (t *entryTable) copyFocusedToClipboard() tea.Cmd {
 func (t *entryTable) deleteFocused() tea.Cmd {
 	focusedKey := t.fieldKeys[t.model.Cursor()]
 	if isDefaultEntryField(focusedKey) {
-		return nil
+		t.entry.UpdateField(focusedKey, "")
+	} else {
+		t.entry.DeleteField(focusedKey)
 	}
-
-	t.entry.DeleteField(focusedKey)
 
 	if t.model.Cursor() >= len(t.entry.Strings) {
 		t.model.SetCursor(len(t.entry.Strings) - 1)
