@@ -2,39 +2,33 @@ package tui
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const DEFAULT_MESSAGE = "Ready."
+const INITIAL_MESSAGE = "Ready."
 const PROMPT_COMMAND = ":"
 const PROMPT_SEARCH = "/"
 const PROMPT_REV_SEARCH = "?"
 
-type inputMode int
-
-const (
-	inputNone inputMode = iota
-	inputCommand
-	inputSearch
-)
+type CmdLineInputCallback func(string) tea.Cmd
 
 type CommandLine struct {
-	input     textinput.Model
-	inputMode inputMode
-	message   string
+	input    textinput.Model
+	message  string
+	callback CmdLineInputCallback
 }
 
 func NewCommandLine() CommandLine {
 	input := textinput.New()
 	input.Prompt = ""
 	return CommandLine{
-		input:     input,
-		inputMode: inputNone,
-		message:   DEFAULT_MESSAGE,
+		input:    input,
+		message:  INITIAL_MESSAGE,
+		callback: nil,
 	}
 }
 
@@ -43,6 +37,10 @@ func (c CommandLine) Init() tea.Cmd {
 }
 
 func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
+	if !c.Focused() {
+		return c, nil
+	}
+
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case setCommandLineMessageMsg:
@@ -50,24 +48,13 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 		c.SetMessage(msg.msg)
 		return c, nil
 	case tea.KeyMsg:
-		if c.inputMode == inputNone {
-			switch msg.String() {
-			case PROMPT_COMMAND:
-				return c, c.startInput(inputCommand, PROMPT_COMMAND)
-			case PROMPT_SEARCH:
-				return c, c.startInput(inputSearch, PROMPT_SEARCH)
-			case PROMPT_REV_SEARCH:
-				return c, c.startInput(inputSearch, PROMPT_REV_SEARCH)
-			}
-			return c, nil
-		}
-
 		switch msg.String() {
 		case "esc", "ctrl+c":
 			c.endInput()
 			return c, nil
 		case "enter":
-			return c, c.onEnter()
+			cmd = c.onEnter()
+			return c, cmd
 		case "backspace":
 			if len(c.input.Value()) == 0 {
 				c.endInput()
@@ -80,59 +67,85 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 	return c, nil
 }
 
-func (c *CommandLine) startInput(mode inputMode, prompt string) tea.Cmd {
-	c.inputMode = mode
+func (c *CommandLine) StartInput(prompt string, callback CmdLineInputCallback) tea.Cmd {
 	c.input.SetValue("")
+	c.callback = callback
 	c.input.Prompt = prompt
 	return c.input.Focus()
 }
 
 func (c *CommandLine) endInput() {
-	c.inputMode = inputNone
 	c.input.Blur()
-	c.message = DEFAULT_MESSAGE
+	c.message = ""
 }
 
 func (c *CommandLine) onEnter() tea.Cmd {
-	if c.inputMode == inputNone {
+	if !c.input.Focused() {
 		return nil
 	}
-	inputMode := c.inputMode
 	c.endInput()
-	c.message = c.input.Prompt + c.input.Value()
+	c.SetMessage(c.input.Prompt + c.input.Value())
 
-	switch inputMode {
-	case inputCommand:
-		return c.onCommandInput()
-	case inputSearch:
-		return c.onSearchInput()
+	if c.callback == nil {
+		log.Println("ERROR: No callback set in CommandLine.onEnter()")
+		return nil
 	}
-	return nil
+
+	return c.callback(c.input.Value())
 }
 
-func (c *CommandLine) onCommandInput() tea.Cmd {
-	cmdAsStrings, err := parseInputAsCommand(c.input.Value())
+func parseInputAsSearch(input string) (string, error) {
+	if len(input) == 0 {
+		return "", errors.New("Empty search")
+	}
+	return input, nil
+}
+
+func (c CommandLine) View() string {
+	if c.input.Focused() {
+		return c.input.View()
+	} else {
+		return c.message
+	}
+}
+
+func (c *CommandLine) SetMessage(msg string) {
+	c.message = msg
+}
+
+func (c CommandLine) Focused() bool {
+	return c.input.Focused()
+}
+
+func (c CommandLine) GetHeight() int {
+	return 1
+}
+
+type commandInputMsg struct {
+	cmd []string
+}
+
+type searchInputMsg struct {
+	query   string
+	reverse bool
+}
+
+func CommandCallback(s string) tea.Cmd {
+	cmdAsStrings, err := parseInputAsCommand(s)
 	if err != nil || len(cmdAsStrings) == 0 {
 		return nil
 	}
 	return func() tea.Msg { return commandInputMsg{cmdAsStrings} }
 }
 
-func (c *CommandLine) onSearchInput() tea.Cmd {
-	var reverse bool
-	switch c.input.Prompt {
-	case PROMPT_SEARCH:
-		reverse = false
-	case PROMPT_REV_SEARCH:
-		reverse = true
-	default:
-		panic(fmt.Sprintf("Invalid Prompt after search input: '%s'", c.input.Prompt))
+func SearchCallback(reverse bool) CmdLineInputCallback {
+	return func(s string) tea.Cmd {
+		inputAsSearch, err := parseInputAsSearch(s)
+		if err != nil || len(inputAsSearch) == 0 {
+			return nil
+		}
+		return func() tea.Msg { return searchInputMsg{inputAsSearch, reverse} }
 	}
-	inputAsSearch, err := parseInputAsSearch(c.input.Value())
-	if err != nil || len(inputAsSearch) == 0 {
-		return nil
-	}
-	return func() tea.Msg { return searchInputMsg{inputAsSearch, reverse} }
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
@@ -147,43 +160,4 @@ func parseInputAsCommand(input string) ([]string, error) {
 		}
 	}
 	return cmd, nil
-}
-
-func parseInputAsSearch(input string) (string, error) {
-	if len(input) == 0 {
-		return "", errors.New("Empty search")
-	}
-	return input, nil
-}
-
-func (c CommandLine) View() string {
-	switch c.inputMode {
-	case inputNone:
-		return c.message
-	case inputCommand, inputSearch:
-		return c.input.View()
-	default:
-		panic(fmt.Sprintf("ERROR: Invalid input mode %d", c.inputMode))
-	}
-}
-
-func (c *CommandLine) SetMessage(msg string) {
-	c.message = msg
-}
-
-func (c CommandLine) Focused() bool {
-	return c.inputMode != inputNone
-}
-
-func (c CommandLine) GetHeight() int {
-	return 1
-}
-
-type commandInputMsg struct {
-	cmd []string
-}
-
-type searchInputMsg struct {
-	query   string
-	reverse bool
 }
