@@ -22,6 +22,8 @@ const (
 	InputSearch
 )
 
+type CmdLineInputCallback func(string) tea.Cmd
+
 type CommandLine struct {
 	input     textinput.Model
 	inputMode inputMode
@@ -95,36 +97,30 @@ func (c *CommandLine) onEnter() tea.Cmd {
 
 	switch inputMode {
 	case InputCommand:
-		return c.onCommandInput()
+		return commandCallback(c.input.Value())
 	case InputSearch:
-		return c.onSearchInput()
+		// TODO: Remove hard-coded reverse=false
+		return searchCallback(false)(c.input.Value())
 	}
 	return nil
 }
 
-func (c *CommandLine) onCommandInput() tea.Cmd {
-	cmdAsStrings, err := parseInputAsCommand(c.input.Value())
+func commandCallback(s string) tea.Cmd {
+	cmdAsStrings, err := parseInputAsCommand(s)
 	if err != nil || len(cmdAsStrings) == 0 {
 		return nil
 	}
 	return func() tea.Msg { return commandInputMsg{cmdAsStrings} }
 }
 
-func (c *CommandLine) onSearchInput() tea.Cmd {
-	var reverse bool
-	switch c.input.Prompt {
-	case PROMPT_SEARCH:
-		reverse = false
-	case PROMPT_REV_SEARCH:
-		reverse = true
-	default:
-		panic(fmt.Sprintf("Invalid Prompt after search input: '%s'", c.input.Prompt))
+func searchCallback(reverse bool) CmdLineInputCallback {
+	return func(s string) tea.Cmd {
+		inputAsSearch, err := parseInputAsSearch(s)
+		if err != nil || len(inputAsSearch) == 0 {
+			return nil
+		}
+		return func() tea.Msg { return searchInputMsg{inputAsSearch, reverse} }
 	}
-	inputAsSearch, err := parseInputAsSearch(c.input.Value())
-	if err != nil || len(inputAsSearch) == 0 {
-		return nil
-	}
-	return func() tea.Msg { return searchInputMsg{inputAsSearch, reverse} }
 }
 
 func parseInputAsCommand(input string) ([]string, error) {
