@@ -7,6 +7,7 @@ import (
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/keepass/undo"
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,6 +39,7 @@ type Navigate struct {
 	windowHeight int
 
 	database *database.Database
+	undoman  undo.UndoManager[parser.Document]
 }
 
 func NewNavigate(database *database.Database, windowWidth, windowHeight int) Navigate {
@@ -60,6 +62,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
 		database:     database,
+		undoman:      undo.NewUndoManager[parser.Document](),
 	}
 	n.cmdLine = NewCommandLine()
 	n.parent = newGroupTable(tableStyles, true, false)
@@ -377,9 +380,9 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while saving: %s", msg.err))
 	case loadFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
-	case updateEntryMsg:
-		n.database.Parsed().UpdateEntry(msg.newEntry)
-		n.updatePreview()
+	case undoableActionMsg:
+		n.undoman.Do(n.database.Parsed(), msg.action)
+		n.updateAll()
 	case leaveEntryEditor:
 		n.selector.Focus()
 		n.entryPreview.Blur()
@@ -393,8 +396,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Key events should not be handled by Navigate in case the command line is active
 			break
 		}
-
-		if handled, cmd := n.handleCtrlC(msg); handled {
+		if handled, cmd := n.handleKeyAnyFocus(msg); handled {
 			return n, cmd
 		}
 		if handled, cmd := n.handleKeyCmdLineTrigger(msg); handled {
@@ -417,9 +419,14 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (n *Navigate) handleCtrlC(msg tea.KeyMsg) (bool, tea.Cmd) {
-	if msg.String() == "ctrl+c" {
+func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
 		n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
+		return true, nil
+	case "u":
+		n.undoman.Undo(n.database.Parsed())
+		n.updateAll()
 		return true, nil
 	}
 	return false, nil

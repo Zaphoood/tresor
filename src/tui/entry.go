@@ -6,6 +6,7 @@ import (
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/keepass/undo"
 	"github.com/Zaphoood/tresor/src/util/set"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -167,17 +168,19 @@ func (t *entryTable) copyFocusedToClipboard() tea.Cmd {
 
 func (t *entryTable) deleteFocused() tea.Cmd {
 	focusedKey := t.fieldKeys[t.model.Cursor()]
+	newEntry := t.entry
 	if isDefaultEntryField(focusedKey) {
-		t.entry.UpdateField(focusedKey, "")
+		newEntry.UpdateField(focusedKey, "")
+		// TODO: Check if new entry is identical, in that case return nil
 	} else {
-		t.entry.DeleteField(focusedKey)
+		newEntry.DeleteField(focusedKey)
 	}
 
-	if t.model.Cursor() >= len(t.entry.Strings) {
-		t.model.SetCursor(len(t.entry.Strings) - 1)
+	if t.model.Cursor() >= len(newEntry.Strings) {
+		t.model.SetCursor(len(newEntry.Strings) - 1)
 	}
 
-	return func() tea.Msg { return updateEntryMsg{t.entry} }
+	return func() tea.Msg { return undoableActionMsg{action: undo.NewUpdateEntryAction(newEntry, t.entry)} }
 }
 
 // truncateHeader removes the header of a bubbles table by

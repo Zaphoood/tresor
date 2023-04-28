@@ -10,6 +10,7 @@ import (
 	"github.com/Zaphoood/tresor/src/keepass/crypto"
 	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/keepass/undo"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -143,6 +144,6 @@ type setCommandLineMessageMsg struct {
 	msg string
 }
 
-type updateEntryMsg struct {
-	newEntry parser.Entry
+type undoableActionMsg struct {
+	action undo.Action[parser.Document]
 }
