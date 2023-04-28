@@ -1,6 +1,8 @@
 package undo
 
-import "github.com/Zaphoood/tresor/src/util"
+import (
+	"github.com/Zaphoood/tresor/src/util"
+)
 
 type Action[T any] interface {
 	Do(*T)
@@ -20,48 +22,37 @@ func (_ AtNewestChange) Error() string {
 }
 
 type UndoManager[T any] struct {
-	managed *T
 	actions []Action[T]
 	// step is an index into actions which points at the action after last executed action
 	step int
 }
 
-func NewUndoManager[T any](initial *T) UndoManager[T] {
+func NewUndoManager[T any]() UndoManager[T] {
 	return UndoManager[T]{
-		managed: initial,
 		actions: []Action[T]{},
 		step:    0,
 	}
 }
-
-func (u *UndoManager[T]) Get() T {
-	return *u.managed
-}
-
-func (u *UndoManager[T]) Set(value T) {
-	*u.managed = value
-}
-
-func (u *UndoManager[T]) Do(action Action[T]) {
-	action.Do(u.managed)
-	u.actions = append(u.actions[:util.Max(u.step, len(u.actions))], action)
+func (u *UndoManager[T]) Do(target *T, action Action[T]) {
+	action.Do(target)
+	u.actions = append(u.actions[:util.Min(u.step, len(u.actions))], action)
 	u.step++
 }
 
-func (u *UndoManager[T]) Undo() error {
+func (u *UndoManager[T]) Undo(target *T) error {
 	if u.step == 0 {
 		return AtLastChange{}
 	}
 	u.step--
-	u.actions[u.step].Undo(u.managed)
+	u.actions[u.step].Undo(target)
 	return nil
 }
 
-func (u *UndoManager[T]) Redo() error {
+func (u *UndoManager[T]) Redo(target *T) error {
 	if u.step >= len(u.actions) {
 		return AtNewestChange{}
 	}
-	u.actions[u.step].Do(u.managed)
+	u.actions[u.step].Do(target)
 	u.step++
 	return nil
 }

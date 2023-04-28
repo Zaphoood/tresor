@@ -52,7 +52,7 @@ func TestUpdateEntry(t *testing.T) {
 	assert := assert.New(t)
 
 	document := parseDecryptedExample(t)
-	u := NewUndoManager(document)
+	u := NewUndoManager[parser.Document]()
 
 	path := []string{"M0Gbdz4OmEaVH1j8pqgWFA==", "A/ntiXf2VEW3qSstTnhbcA=="}
 	entry := assertGetEntry(document, path)
@@ -66,17 +66,17 @@ func TestUpdateEntry(t *testing.T) {
 	newTitle := "foo"
 	newEntry.UpdateField("Title", newTitle)
 
-	u.Do(NewUpdateEntryAction(newEntry, entry))
+	u.Do(document, NewUpdateEntryAction(newEntry, entry))
 
 	entry2 := assertGetEntry(document, path)
 	assert.Equal(newTitle, entry2.TryGet("Title", "(Failed to get field"))
 
-	u.Undo()
+	u.Undo(document)
 
 	entry3 := assertGetEntry(document, path)
 	assert.Equal(originalTitle, entry3.TryGet("Title", "(Failed to get field"))
 
-	u.Redo()
+	u.Redo(document)
 
 	entry4 := assertGetEntry(document, path)
 	assert.Equal(newTitle, entry4.TryGet("Title", "(Failed to get field"))
