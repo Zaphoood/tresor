@@ -1,9 +1,5 @@
 package undo
 
-import (
-	"github.com/Zaphoood/tresor/src/util"
-)
-
 type Action[T any] interface {
 	Do(*T)
 	Undo(*T)
@@ -35,7 +31,7 @@ func NewUndoManager[T any]() UndoManager[T] {
 }
 func (u *UndoManager[T]) Do(target *T, action Action[T]) {
 	action.Do(target)
-	u.actions = append(u.actions[:util.Min(u.step, len(u.actions))], action)
+	u.actions = append(u.actions[:u.step], action)
 	u.step++
 }
 
