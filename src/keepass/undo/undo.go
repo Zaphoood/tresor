@@ -9,10 +9,10 @@ type Action[T any] interface {
 	Undo(*T)
 }
 
-type AtLastChange struct{}
+type AtOldestChange struct{}
 
-func (_ AtLastChange) Error() string {
-	return "Already at last change"
+func (_ AtOldestChange) Error() string {
+	return "Already at oldest change"
 }
 
 type AtNewestChange struct{}
@@ -41,7 +41,7 @@ func (u *UndoManager[T]) Do(target *T, action Action[T]) {
 
 func (u *UndoManager[T]) Undo(target *T) error {
 	if u.step == 0 {
-		return AtLastChange{}
+		return AtOldestChange{}
 	}
 	u.step--
 	u.actions[u.step].Undo(target)

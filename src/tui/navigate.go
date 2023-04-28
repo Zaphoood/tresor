@@ -425,7 +425,27 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 		n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
 		return true, nil
 	case "u":
-		n.undoman.Undo(n.database.Parsed())
+		err := n.undoman.Undo(n.database.Parsed())
+		if err != nil {
+			if _, ok := err.(undo.AtOldestChange); ok {
+				n.cmdLine.SetMessage(err.Error())
+			} else {
+				log.Println(err)
+			}
+			return true, nil
+		}
+		n.updateAll()
+		return true, nil
+	case "ctrl+r":
+		err := n.undoman.Redo(n.database.Parsed())
+		if err != nil {
+			if _, ok := err.(undo.AtNewestChange); ok {
+				n.cmdLine.SetMessage(err.Error())
+			} else {
+				log.Println(err)
+			}
+			return true, nil
+		}
 		n.updateAll()
 		return true, nil
 	}
