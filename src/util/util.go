@@ -1,18 +1,10 @@
 package util
 
-//import (
-//	"golang.org/x/exp/constraints"
-//)
-//
-//func Max[T constraints.Ordered](a T, b T) T {
-//	if a > b {
-//		return a
-//	}
-//	return b
-//}
+import (
+	"golang.org/x/exp/constraints"
+)
 
-// TODO: Use generic version of this function
-func Max(a int, b int) int {
+func Max[T constraints.Ordered](a T, b T) T {
 	if a > b {
 		return a
 	}

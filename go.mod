@@ -10,6 +10,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	golang.design/x/clipboard v0.6.3
 	golang.org/x/crypto v0.6.0
+	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
 )
 
 require (
@@ -27,7 +28,7 @@ require (
 	github.com/muesli/termenv v0.13.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	golang.org/x/exp v0.0.0-20190731235908-ec7cb31e5a56 // indirect
+	golang.org/x/exp/shiny v0.0.0-20230425010034-47ecfdc1ba53 // indirect
 	golang.org/x/image v0.7.0 // indirect
 	golang.org/x/mobile v0.0.0-20210716004757-34ab1303b554 // indirect
 	golang.org/x/sys v0.5.0 // indirect
