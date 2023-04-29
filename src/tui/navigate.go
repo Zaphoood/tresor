@@ -25,7 +25,7 @@ type Navigate struct {
 	selector     groupTable
 	groupPreview groupTable
 	entryPreview entryTable
-	lastCursor   map[string]string
+	lastCursors  map[string]string
 	cmdLine      CommandLine
 
 	search        []string
@@ -58,7 +58,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 	}
 	n := Navigate{
 		path:         []string{},
-		lastCursor:   make(map[string]string),
+		lastCursors:  make(map[string]string),
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
 		database:     database,
@@ -75,7 +75,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 
 	n.resizeAll()
 	n.loadLastSelected()
-	n.updateAll()
+	n.loadAllTables(true)
 
 	initClipboard()
 
@@ -96,16 +96,20 @@ func (n *Navigate) resizeAll() {
 	n.entryPreview.Resize(previewWidth, height)
 }
 
-func (n *Navigate) updateAll() {
+func (n *Navigate) loadAllTables(updateCursor bool) {
+	lastCursors := &n.lastCursors
+	if !updateCursor {
+		lastCursors = nil
+	}
 	if len(n.path) == 0 {
 		n.parent.Clear()
 	} else {
-		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], &n.lastCursor)
+		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], lastCursors)
 	}
-	n.selector.Load(n.database.Parsed(), n.path, &n.lastCursor)
+	n.selector.Load(n.database.Parsed(), n.path, lastCursors)
 	// Reset search results
 	n.search = []string{}
-	n.updatePreview()
+	n.loadPreviewTable(updateCursor)
 }
 
 func (n *Navigate) loadLastSelected() {
@@ -120,7 +124,7 @@ func (n *Navigate) loadLastSelected() {
 	}
 	n.path = path
 	for i := 0; i < len(path)-1; i++ {
-		n.lastCursor[path[i]] = path[i+1]
+		n.lastCursors[path[i]] = path[i+1]
 	}
 }
 
@@ -146,14 +150,18 @@ func (n *Navigate) getFocusedItem() *parser.Item {
 	return &item
 }
 
-func (n *Navigate) updatePreview() {
+func (n *Navigate) loadPreviewTable(updateCursor bool) {
+	lastCursors := &n.lastCursors
+	if !updateCursor {
+		lastCursors = nil
+	}
 	focusedItem := n.getFocusedItem()
 	if focusedItem == nil {
 		return
 	}
 	switch focusedItem := (*focusedItem).(type) {
 	case parser.Group:
-		n.groupPreview.LoadGroup(focusedItem, &n.lastCursor)
+		n.groupPreview.LoadGroup(focusedItem, lastCursors)
 	case parser.Entry:
 		n.entryPreview.LoadEntry(focusedItem, n.database)
 	default:
@@ -168,7 +176,7 @@ func (n *Navigate) moveLeft() {
 	}
 	n.rememberSelected()
 	n.path = n.path[:len(n.path)-1]
-	n.updateAll()
+	n.loadAllTables(true)
 }
 
 func (n *Navigate) moveRight() {
@@ -182,7 +190,7 @@ func (n *Navigate) moveRight() {
 	case parser.Group:
 		n.rememberSelected()
 		n.path = newPath
-		n.updateAll()
+		n.loadAllTables(true)
 	case parser.Entry:
 		n.selector.Blur()
 		n.entryPreview.Focus()
@@ -191,7 +199,7 @@ func (n *Navigate) moveRight() {
 
 func (n *Navigate) rememberSelected() {
 	if parentFocusedUUID := n.parent.FocusedUUID(); len(parentFocusedUUID) > 0 {
-		n.lastCursor[parentFocusedUUID] = n.focusedUUID()
+		n.lastCursors[parentFocusedUUID] = n.focusedUUID()
 	}
 }
 
@@ -366,7 +374,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		clearClipboard()
 		return n, tea.Quit
 	case groupTableCursorChanged:
-		n.updatePreview()
+		n.loadPreviewTable(true)
 	case commandInputMsg:
 		cmd = n.handleCommand(msg.cmd)
 		return n, cmd
@@ -382,7 +390,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
 	case undoableActionMsg:
 		n.undoman.Do(n.database.Parsed(), msg.action)
-		n.updateAll()
+		n.loadAllTables(false)
 	case leaveEntryEditor:
 		n.selector.Focus()
 		n.entryPreview.Blur()
@@ -434,7 +442,7 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 			}
 			return true, nil
 		}
-		n.updateAll()
+		n.loadAllTables(false)
 		return true, nil
 	case "ctrl+r":
 		err := n.undoman.Redo(n.database.Parsed())
@@ -446,7 +454,7 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 			}
 			return true, nil
 		}
-		n.updateAll()
+		n.loadAllTables(false)
 		return true, nil
 	}
 	return false, nil

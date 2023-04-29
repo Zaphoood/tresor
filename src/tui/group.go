@@ -109,7 +109,7 @@ func (t *groupTable) Focused() bool {
 	return t.model.Focused()
 }
 
-func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[string]string) {
+func (t *groupTable) Load(d *parser.Document, path []string, lastCursors *map[string]string) {
 	item, err := d.GetItem(path)
 	if err != nil {
 		t.model.SetRows([]table.Row{
@@ -124,9 +124,11 @@ func (t *groupTable) Load(d *parser.Document, path []string, lastSelected *map[s
 		t.Clear()
 		return
 	}
-	t.LoadGroup(group, lastSelected)
+	t.LoadGroup(group, lastCursors)
 }
 
+// LoadGroup loads a given `parser.Group` as the tables content and sets the cursor
+// to the remembered position in `lastCursors`. If `lastCursors` is nil, cursor is unchanged
 func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
 	t.model.SetStyles(t.styles)
 	if len(group.Groups)+len(group.Entries) == 0 {
@@ -137,6 +139,9 @@ func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]strin
 		return
 	}
 	t.LoadItems(group.Groups, group.Entries)
+	if lastCursors == nil {
+		return
+	}
 	lastCursor, ok := (*lastCursors)[group.UUID]
 	if !ok {
 		t.model.SetCursor(0)

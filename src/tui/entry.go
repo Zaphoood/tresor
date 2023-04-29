@@ -185,7 +185,9 @@ func (t *entryTable) deleteFocused() tea.Cmd {
 		t.model.SetCursor(len(newEntry.Strings) - 1)
 	}
 
-	return func() tea.Msg { return undoableActionMsg{action: undo.NewUpdateEntryAction(newEntry, t.entry)} }
+	return func() tea.Msg {
+		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry)}
+	}
 }
 
 // truncateHeader removes the header of a bubbles table by
