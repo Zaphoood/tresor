@@ -170,10 +170,15 @@ func (t *entryTable) deleteFocused() tea.Cmd {
 	focusedKey := t.fieldKeys[t.model.Cursor()]
 	newEntry := t.entry
 	if isDefaultEntryField(focusedKey) {
-		newEntry.UpdateField(focusedKey, "")
-		// TODO: Check if new entry is identical, in that case return nil
+		changed := newEntry.UpdateField(focusedKey, "")
+		if !changed {
+			return nil
+		}
 	} else {
-		newEntry.DeleteField(focusedKey)
+		changed := newEntry.DeleteField(focusedKey)
+		if !changed {
+			log.Printf("ERROR: Tried to delete field '%s' from entry '%s' but no change made\n", focusedKey, t.entry.UUID)
+		}
 	}
 
 	if t.model.Cursor() >= len(newEntry.Strings) {

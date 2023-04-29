@@ -82,25 +82,38 @@ func (e *Entry) TryGet(key, fallback string) string {
 	return result.Inner
 }
 
-func (e *Entry) DeleteField(key string) {
+// UpdateField deletes the field with the given key, if it exists
+// Returns true if a change was made, false otherwise
+func (e *Entry) DeleteField(key string) bool {
+	changed := false
 	newStrings := make([]String, 0, len(e.Strings))
 	for _, string := range e.Strings {
 		if string.Key != key {
 			newStrings = append(newStrings, string)
+		} else {
+			changed = true
 		}
 	}
 	e.Strings = newStrings
+	return changed
 }
 
-func (e *Entry) UpdateField(key, value string) {
+// UpdateField updates the field with the given key to the given value, if it exists
+// Returns true if a change was made, false otherwise
+func (e *Entry) UpdateField(key, value string) bool {
+	changed := false
 	newStrings := make([]String, 0, len(e.Strings))
 	for _, string := range e.Strings {
 		if string.Key == key {
+			if string.Value.Inner != value {
+				changed = true
+			}
 			string.Value.Inner = value
 		}
 		newStrings = append(newStrings, string)
 	}
 	e.Strings = newStrings
+	return changed
 }
 
 type PathNotFound error
