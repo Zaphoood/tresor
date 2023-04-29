@@ -97,19 +97,28 @@ func (n *Navigate) resizeAll() {
 }
 
 func (n *Navigate) loadAllTables(updateCursor bool) {
-	lastCursors := &n.lastCursors
-	if !updateCursor {
-		lastCursors = nil
-	}
 	if len(n.path) == 0 {
 		n.parent.Clear()
 	} else {
-		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1], lastCursors)
+		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1])
+		if updateCursor {
+			err := n.parent.LoadLastCursor(&n.lastCursors)
+			if err != nil {
+				log.Println(err)
+			}
+		}
 	}
-	n.selector.Load(n.database.Parsed(), n.path, lastCursors)
+	n.selector.Load(n.database.Parsed(), n.path)
+	if updateCursor {
+		err := n.selector.LoadLastCursor(&n.lastCursors)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	n.loadPreviewTable(updateCursor)
+
 	// Reset search results
 	n.search = []string{}
-	n.loadPreviewTable(updateCursor)
 }
 
 func (n *Navigate) loadLastSelected() {
@@ -151,21 +160,21 @@ func (n *Navigate) getFocusedItem() *parser.Item {
 }
 
 func (n *Navigate) loadPreviewTable(updateCursor bool) {
-	lastCursors := &n.lastCursors
-	if !updateCursor {
-		lastCursors = nil
-	}
 	focusedItem := n.getFocusedItem()
 	if focusedItem == nil {
 		return
 	}
 	switch focusedItem := (*focusedItem).(type) {
 	case parser.Group:
-		n.groupPreview.LoadGroup(focusedItem, lastCursors)
+		n.groupPreview.LoadGroup(focusedItem)
+		err := n.groupPreview.LoadLastCursor(&n.lastCursors)
+		if err != nil {
+			log.Println(err)
+		}
 	case parser.Entry:
 		n.entryPreview.LoadEntry(focusedItem, n.database)
 	default:
-		log.Printf("ERROR in updatePreview: Expected Group or Entry from GetItem()")
+		log.Printf("ERROR in updatePreview: Expected Group or Entry as focused item")
 		return
 	}
 }
@@ -199,7 +208,11 @@ func (n *Navigate) moveRight() {
 
 func (n *Navigate) rememberSelected() {
 	if parentFocusedUUID := n.parent.FocusedUUID(); len(parentFocusedUUID) > 0 {
-		n.lastCursors[parentFocusedUUID] = n.focusedUUID()
+		focusedUUID := n.focusedUUID()
+		if len(focusedUUID) == 0 {
+			log.Println("Failed to get focused UUID")
+		}
+		n.lastCursors[parentFocusedUUID] = focusedUUID
 	}
 }
 

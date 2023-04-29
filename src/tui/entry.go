@@ -15,7 +15,7 @@ import (
 const ENCRYPTED_PLACEH = "••••••"
 
 var defaultEntryFields []entryField = []entryField{
-	{"Title", "Title", TITLE_PLACEH},
+	{"Title", "Title", NO_TITLE_PLACEHOLDER},
 	{"UserName", "Username", ""},
 	{"Password", "Password", ""},
 }

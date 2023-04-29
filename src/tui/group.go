@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
@@ -12,9 +13,9 @@ import (
 )
 
 const (
-	GROUP_PLACEH  = "(No entries)"
-	TITLE_PLACEH  = "(No title)"
-	NUM_COL_WIDTH = 3
+	EMPTY_GROUP_PLACEHOLDER = "(No entries)"
+	NO_TITLE_PLACEHOLDER    = "(No title)"
+	NUM_COL_WIDTH           = 3
 )
 
 var numberStyle lipgloss.Style = lipgloss.NewStyle().
@@ -33,6 +34,7 @@ type groupTable struct {
 	stylesEmpty        table.Styles
 	sorted             bool
 	notifyCursorChange bool
+	uuid               string
 	// items is a list of copies of the database items currently being displayed;
 	// only metadata is copied, not sub-items
 	items []parser.Item
@@ -49,6 +51,8 @@ func newGroupTable(styles table.Styles, sorted bool, notifyCursorChange bool, op
 		},
 		sorted:             sorted,
 		notifyCursorChange: notifyCursorChange,
+		uuid:               "",
+		items:              []parser.Item{},
 	}
 }
 
@@ -77,6 +81,7 @@ func (t *groupTable) Clear() {
 	t.model.SetRows([]table.Row{{"", ""}})
 	t.items = []parser.Item{}
 	t.model.SetStyles(t.stylesEmpty)
+	t.uuid = ""
 }
 
 func (t groupTable) Update(msg tea.Msg) (groupTable, tea.Cmd) {
@@ -109,49 +114,57 @@ func (t *groupTable) Focused() bool {
 	return t.model.Focused()
 }
 
-func (t *groupTable) Load(d *parser.Document, path []string, lastCursors *map[string]string) {
+func (t *groupTable) Load(d *parser.Document, path []string) {
 	item, err := d.GetItem(path)
 	if err != nil {
+		t.Clear()
 		t.model.SetRows([]table.Row{
 			{err.Error(), ""},
 		})
-		t.model.SetStyles(t.styles)
-		t.items = []parser.Item{}
+		log.Println(err)
 		return
 	}
 	group, ok := item.(parser.Group)
 	if !ok {
 		t.Clear()
+		log.Println("ERROR: Cannot load item that is not a Group into groupTable")
 		return
 	}
-	t.LoadGroup(group, lastCursors)
+	t.LoadGroup(group)
 }
 
-// LoadGroup loads a given `parser.Group` as the tables content and sets the cursor
-// to the remembered position in `lastCursors`. If `lastCursors` is nil, cursor is unchanged
-func (t *groupTable) LoadGroup(group parser.Group, lastCursors *map[string]string) {
+// LoadGroup loads a given `parser.Group` as the table content
+func (t *groupTable) LoadGroup(group parser.Group) {
 	t.model.SetStyles(t.styles)
 	if len(group.Groups)+len(group.Entries) == 0 {
 		t.Clear()
 		t.model.SetRows([]table.Row{
-			{GROUP_PLACEH, ""},
+			{EMPTY_GROUP_PLACEHOLDER, ""},
 		})
 		return
 	}
+	t.uuid = group.UUID
 	t.LoadItems(group.Groups, group.Entries)
-	if lastCursors == nil {
-		return
+}
+
+// LoadLastCursor sets the cursor to the last remembered position
+func (t *groupTable) LoadLastCursor(lastCursors *map[string]string) error {
+	if len(t.uuid) == 0 {
+		t.model.SetCursor(0)
+		return nil
 	}
-	lastCursor, ok := (*lastCursors)[group.UUID]
+	lastCursor, ok := (*lastCursors)[t.uuid]
 	if !ok {
 		t.model.SetCursor(0)
-		return
+		return nil
 	}
 	for i, item := range t.items {
 		if item.GetUUID() == lastCursor {
 			t.model.SetCursor(i)
+			return nil
 		}
 	}
+	return fmt.Errorf("ERROR: Failed to find last selected item '%s' in group '%s'", lastCursor, t.uuid)
 }
 
 func (t *groupTable) LoadItems(groups []parser.Group, entries []parser.Entry) {
@@ -186,7 +199,7 @@ func (t *groupTable) LoadItems(groups []parser.Group, entries []parser.Entry) {
 		t.items = append(t.items, group.CopyMeta())
 	}
 	for _, entry := range entriesSorted {
-		title := entry.TryGet("Title", TITLE_PLACEH)
+		title := entry.TryGet("Title", NO_TITLE_PLACEHOLDER)
 		rows = append(rows, table.Row{title, ""})
 		t.items = append(t.items, entry.CopyMeta())
 	}
