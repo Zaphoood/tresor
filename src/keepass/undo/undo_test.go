@@ -48,6 +48,8 @@ func assertGetEntry(d *parser.Document, path []string) parser.Entry {
 	return entry
 }
 
+type returnSentinel struct{}
+
 func TestUpdateEntry(t *testing.T) {
 	assert := assert.New(t)
 
@@ -66,17 +68,24 @@ func TestUpdateEntry(t *testing.T) {
 	newTitle := "foo"
 	newEntry.UpdateField("Title", newTitle)
 
-	u.Do(document, NewUpdateEntryAction(newEntry, entry))
+	result := u.Do(document, NewUpdateEntryAction(newEntry, entry, returnSentinel{}))
+	assert.Equal(result, returnSentinel{})
 
 	entry2 := assertGetEntry(document, path)
 	assert.Equal(newTitle, entry2.TryGet("Title", "(Failed to get field"))
 
-	u.Undo(document)
+	result, err = u.Undo(document)
+	if assert.Nil(err) {
+		assert.Equal(result, returnSentinel{})
+	}
 
 	entry3 := assertGetEntry(document, path)
 	assert.Equal(originalTitle, entry3.TryGet("Title", "(Failed to get field"))
 
-	u.Redo(document)
+	result, err = u.Redo(document)
+	if assert.Nil(err) {
+		assert.Equal(result, returnSentinel{})
+	}
 
 	entry4 := assertGetEntry(document, path)
 	assert.Equal(newTitle, entry4.TryGet("Title", "(Failed to get field"))
