@@ -154,7 +154,7 @@ func (d *Document) UpdateEntry(newEntry Entry) bool {
 	return false
 }
 
-// FindPath returns the path to a group with the given UUID if it exists,
+// FindPath returns the path to an item with the given UUID if it exists,
 // and a bool indicating wether the UUID was found.
 func (d *Document) FindPath(uuid string) ([]string, bool) {
 	return findPathInGroups(uuid, d.Root.Groups)
@@ -164,6 +164,11 @@ func findPathInGroups(uuid string, groups []Group) ([]string, bool) {
 	for _, group := range groups {
 		if group.UUID == uuid {
 			return []string{group.UUID}, true
+		}
+		for _, entry := range group.Entries {
+			if entry.UUID == uuid {
+				return []string{group.UUID, entry.UUID}, true
+			}
 		}
 		subpath, found := findPathInGroups(uuid, group.Groups)
 		if found {
