@@ -399,7 +399,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case loadFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
 	case undoableActionMsg:
-		n.undoman.Do(n.database.Parsed(), msg.action)
+		result := n.undoman.Do(n.database.Parsed(), msg.action)
+		if result, ok := result.(string); ok {
+			log.Println(result)
+		}
 		n.loadAllTables(false)
 	case leaveEntryEditor:
 		n.selector.Focus()
@@ -443,7 +446,7 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 		n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
 		return true, nil
 	case "u":
-		err := n.undoman.Undo(n.database.Parsed())
+		result, err := n.undoman.Undo(n.database.Parsed())
 		if err != nil {
 			if _, ok := err.(undo.AtOldestChange); ok {
 				n.cmdLine.SetMessage(err.Error())
@@ -452,10 +455,13 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 			}
 			return true, nil
 		}
+		if result, ok := result.(string); ok {
+			log.Println(result)
+		}
 		n.loadAllTables(false)
 		return true, nil
 	case "ctrl+r":
-		err := n.undoman.Redo(n.database.Parsed())
+		result, err := n.undoman.Redo(n.database.Parsed())
 		if err != nil {
 			if _, ok := err.(undo.AtNewestChange); ok {
 				n.cmdLine.SetMessage(err.Error())
@@ -463,6 +469,9 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 				log.Println(err)
 			}
 			return true, nil
+		}
+		if result, ok := result.(string); ok {
+			log.Println(result)
 		}
 		n.loadAllTables(false)
 		return true, nil

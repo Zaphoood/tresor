@@ -1,8 +1,8 @@
 package undo
 
 type Action[T any] interface {
-	Do(*T)
-	Undo(*T)
+	Do(*T) interface{}
+	Undo(*T) interface{}
 }
 
 type AtOldestChange struct{}
@@ -29,26 +29,25 @@ func NewUndoManager[T any]() UndoManager[T] {
 		step:    0,
 	}
 }
-func (u *UndoManager[T]) Do(target *T, action Action[T]) {
-	action.Do(target)
+func (u *UndoManager[T]) Do(target *T, action Action[T]) interface{} {
 	u.actions = append(u.actions[:u.step], action)
 	u.step++
+	return action.Do(target)
 }
 
-func (u *UndoManager[T]) Undo(target *T) error {
+func (u *UndoManager[T]) Undo(target *T) (interface{}, error) {
 	if u.step == 0 {
-		return AtOldestChange{}
+		return nil, AtOldestChange{}
 	}
 	u.step--
-	u.actions[u.step].Undo(target)
-	return nil
+	return u.actions[u.step].Undo(target), nil
 }
 
-func (u *UndoManager[T]) Redo(target *T) error {
+func (u *UndoManager[T]) Redo(target *T) (interface{}, error) {
 	if u.step >= len(u.actions) {
-		return AtNewestChange{}
+		return nil, AtNewestChange{}
 	}
-	u.actions[u.step].Do(target)
+	result := u.actions[u.step].Do(target)
 	u.step++
-	return nil
+	return result, nil
 }

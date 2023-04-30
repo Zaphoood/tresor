@@ -10,12 +10,14 @@ type UpdateEntryAction struct {
 	oldEntry parser.Entry
 }
 
-func (a UpdateEntryAction) Do(p *parser.Document) {
+func (a UpdateEntryAction) Do(p *parser.Document) interface{} {
 	p.UpdateEntry(a.newEntry)
+	return "Update entry"
 }
 
-func (a UpdateEntryAction) Undo(p *parser.Document) {
+func (a UpdateEntryAction) Undo(p *parser.Document) interface{} {
 	p.UpdateEntry(a.oldEntry)
+	return "Undo update entry"
 }
 
 func NewUpdateEntryAction(newEntry, oldEntry parser.Entry) UpdateEntryAction {
