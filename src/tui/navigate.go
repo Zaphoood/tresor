@@ -386,7 +386,19 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case groupTableCursorChanged:
 		n.loadPreviewTable(true)
 	case focusItemMsg:
-		log.Printf("We should focus item '%s' now", msg.uuid)
+		path, found := n.database.Parsed().FindPath(msg.uuid)
+		if !found {
+			log.Printf("ERROR: Cannot focus on item '%s' (not found)", msg.uuid)
+		}
+		if len(path) > 0 {
+			n.path = path[:len(path)-1]
+			n.loadAllTables(false)
+			cmd, err := n.selector.SetCursorToUUID(msg.uuid)
+			if err != nil {
+				log.Println(err)
+			}
+			return n, cmd
+		}
 	case commandInputMsg:
 		cmd = n.handleCommand(msg.cmd)
 		return n, cmd
