@@ -123,6 +123,26 @@ func (n *Navigate) loadAllTables(updateCursor bool) {
 	n.search = []string{}
 }
 
+func (n *Navigate) loadPreviewTable(updateCursor bool) {
+	focusedItem := n.getFocusedItem()
+	if focusedItem == nil {
+		return
+	}
+	switch focusedItem := (*focusedItem).(type) {
+	case parser.Group:
+		n.groupPreview.LoadGroup(focusedItem)
+		err := n.groupPreview.LoadLastCursor(&n.lastCursors)
+		if err != nil {
+			log.Println(err)
+		}
+	case parser.Entry:
+		n.entryPreview.LoadEntry(focusedItem, n.database)
+	default:
+		log.Printf("ERROR in updatePreview: Expected Group or Entry as focused item")
+		return
+	}
+}
+
 func (n *Navigate) reopenLastGroup() {
 	n.path = []string{n.database.Parsed().Root.Groups[0].UUID}
 	lastSelected := n.database.Parsed().Meta.LastSelectedGroup
@@ -159,26 +179,6 @@ func (n *Navigate) getFocusedItem() *parser.Item {
 		return nil
 	}
 	return &item
-}
-
-func (n *Navigate) loadPreviewTable(updateCursor bool) {
-	focusedItem := n.getFocusedItem()
-	if focusedItem == nil {
-		return
-	}
-	switch focusedItem := (*focusedItem).(type) {
-	case parser.Group:
-		n.groupPreview.LoadGroup(focusedItem)
-		err := n.groupPreview.LoadLastCursor(&n.lastCursors)
-		if err != nil {
-			log.Println(err)
-		}
-	case parser.Entry:
-		n.entryPreview.LoadEntry(focusedItem, n.database)
-	default:
-		log.Printf("ERROR in updatePreview: Expected Group or Entry as focused item")
-		return
-	}
 }
 
 func (n *Navigate) moveLeft() {
