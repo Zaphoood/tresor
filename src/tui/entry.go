@@ -185,8 +185,11 @@ func (t *entryTable) deleteFocused() tea.Cmd {
 		t.model.SetCursor(len(newEntry.Strings) - 1)
 	}
 
+	var focusChangedItem tea.Cmd = func() tea.Msg {
+		return focusItemMsg{newEntry.UUID}
+	}
 	return func() tea.Msg {
-		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry)}
+		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry, focusChangedItem)}
 	}
 }
 

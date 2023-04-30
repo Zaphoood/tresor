@@ -147,3 +147,7 @@ type setCommandLineMessageMsg struct {
 type undoableActionMsg struct {
 	action undo.Action[parser.Document]
 }
+
+type focusItemMsg struct {
+	uuid string
+}

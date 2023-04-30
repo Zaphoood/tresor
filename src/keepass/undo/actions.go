@@ -6,23 +6,24 @@ import (
 )
 
 type UpdateEntryAction struct {
-	newEntry parser.Entry
-	oldEntry parser.Entry
+	newEntry    parser.Entry
+	oldEntry    parser.Entry
+	returnValue interface{}
 }
 
 func (a UpdateEntryAction) Do(p *parser.Document) interface{} {
 	p.UpdateEntry(a.newEntry)
-	return "Update entry"
+	return a.returnValue
 }
 
 func (a UpdateEntryAction) Undo(p *parser.Document) interface{} {
 	p.UpdateEntry(a.oldEntry)
-	return "Undo update entry"
+	return a.returnValue
 }
 
-func NewUpdateEntryAction(newEntry, oldEntry parser.Entry) UpdateEntryAction {
+func NewUpdateEntryAction(newEntry, oldEntry parser.Entry, returnValue interface{}) UpdateEntryAction {
 	if newEntry.UUID != oldEntry.UUID {
 		panic(fmt.Sprintf("ERROR: Different UUIDs for old and new entry: '%s' != '%s'", newEntry.UUID, oldEntry.UUID))
 	}
-	return UpdateEntryAction{newEntry, oldEntry}
+	return UpdateEntryAction{newEntry, oldEntry, returnValue}
 }
