@@ -131,6 +131,9 @@ func (n *Navigate) loadPreviewTable(updateCursor bool) {
 	switch focusedItem := (*focusedItem).(type) {
 	case parser.Group:
 		n.groupPreview.LoadGroup(focusedItem)
+		if !updateCursor {
+			return
+		}
 		err := n.groupPreview.LoadLastCursor(&n.lastCursors)
 		if err != nil {
 			log.Println(err)
