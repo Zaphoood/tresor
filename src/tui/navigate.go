@@ -74,7 +74,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 	)
 
 	n.resizeAll()
-	n.loadLastSelected()
+	n.reopenLastGroup()
 	n.loadAllTables(true)
 
 	initClipboard()
@@ -108,6 +108,7 @@ func (n *Navigate) loadAllTables(updateCursor bool) {
 			}
 		}
 	}
+
 	n.selector.Load(n.database.Parsed(), n.path)
 	if updateCursor {
 		err := n.selector.LoadLastCursor(&n.lastCursors)
@@ -115,13 +116,14 @@ func (n *Navigate) loadAllTables(updateCursor bool) {
 			log.Println(err)
 		}
 	}
+
 	n.loadPreviewTable(updateCursor)
 
 	// Reset search results
 	n.search = []string{}
 }
 
-func (n *Navigate) loadLastSelected() {
+func (n *Navigate) reopenLastGroup() {
 	n.path = []string{n.database.Parsed().Root.Groups[0].UUID}
 	lastSelected := n.database.Parsed().Meta.LastSelectedGroup
 	if len(lastSelected) == 0 {
@@ -147,7 +149,7 @@ func (n *Navigate) saveLastSelected() {
 
 // getFocusedItem returns the currently focused database item if it exists, otherwise nil
 func (n *Navigate) getFocusedItem() *parser.Item {
-	focused := n.focusedUUID()
+	focused := n.selector.FocusedUUID()
 	if len(focused) == 0 {
 		return nil
 	}
@@ -183,13 +185,13 @@ func (n *Navigate) moveLeft() {
 	if len(n.path) == 0 {
 		return
 	}
-	n.rememberSelected()
+	n.rememberCursor()
 	n.path = n.path[:len(n.path)-1]
 	n.loadAllTables(true)
 }
 
 func (n *Navigate) moveRight() {
-	newPath := append(n.path, n.focusedUUID())
+	newPath := append(n.path, n.selector.FocusedUUID())
 	focusedItem, err := n.database.Parsed().GetItem(newPath)
 	if err != nil {
 		return
@@ -197,7 +199,7 @@ func (n *Navigate) moveRight() {
 
 	switch focusedItem.(type) {
 	case parser.Group:
-		n.rememberSelected()
+		n.rememberCursor()
 		n.path = newPath
 		n.loadAllTables(true)
 	case parser.Entry:
@@ -206,18 +208,10 @@ func (n *Navigate) moveRight() {
 	}
 }
 
-func (n *Navigate) rememberSelected() {
+func (n *Navigate) rememberCursor() {
 	if parentFocusedUUID := n.parent.FocusedUUID(); len(parentFocusedUUID) > 0 {
-		focusedUUID := n.focusedUUID()
-		if len(focusedUUID) == 0 {
-			log.Println("Failed to get focused UUID")
-		}
-		n.lastCursors[parentFocusedUUID] = focusedUUID
+		n.lastCursors[parentFocusedUUID] = n.selector.FocusedUUID()
 	}
-}
-
-func (n Navigate) focusedUUID() string {
-	return n.selector.FocusedUUID()
 }
 
 func (n *Navigate) copyToClipboard() tea.Cmd {
