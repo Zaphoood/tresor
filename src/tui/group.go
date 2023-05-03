@@ -185,11 +185,11 @@ func (t *groupTable) LoadItems(groups []parser.Group, entries []parser.Entry) {
 		sort.Slice(entriesSorted, func(i, j int) bool {
 			firstTitle, err := entriesSorted[i].Get("Title")
 			if err != nil {
-				return false
+				return true
 			}
 			secondTitle, err := entriesSorted[j].Get("Title")
 			if err != nil {
-				return true
+				return false
 			}
 			return strings.ToLower(firstTitle.Inner) < strings.ToLower(secondTitle.Inner)
 		})
@@ -200,6 +200,9 @@ func (t *groupTable) LoadItems(groups []parser.Group, entries []parser.Entry) {
 	}
 	for _, entry := range entriesSorted {
 		title := entry.TryGet("Title", NO_TITLE_PLACEHOLDER)
+		if len(title) == 0 {
+			title = NO_TITLE_PLACEHOLDER
+		}
 		rows = append(rows, table.Row{title, ""})
 		t.items = append(t.items, entry.CopyMeta())
 	}
