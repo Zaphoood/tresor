@@ -8,6 +8,10 @@ Set FontSize 20
 
 Require tresor
 
+Type "export COLORTERM=truecolor"
+Enter
+Sleep 1s
+
 Type "neofetch"
 Enter
 Sleep 5s
