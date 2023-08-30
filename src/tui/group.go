@@ -153,18 +153,18 @@ func (t *groupTable) LoadLastCursor(lastCursors *map[string]string) error {
 		t.model.SetCursor(0)
 		return nil
 	}
-	lastCursor, ok := (*lastCursors)[t.uuid]
+	lastCursorUUID, ok := (*lastCursors)[t.uuid]
 	if !ok {
 		t.model.SetCursor(0)
 		return nil
 	}
 	for i, item := range t.items {
-		if item.GetUUID() == lastCursor {
+		if item.GetUUID() == lastCursorUUID {
 			t.model.SetCursor(i)
 			return nil
 		}
 	}
-	return fmt.Errorf("ERROR: Failed to find last selected item '%s' in group '%s'", lastCursor, t.uuid)
+	return fmt.Errorf("ERROR: Failed to find last selected item '%s' in group '%s'", lastCursorUUID, t.uuid)
 }
 
 func (t *groupTable) LoadItems(groups []parser.Group, entries []parser.Entry) {
