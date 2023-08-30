@@ -318,7 +318,7 @@ func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
 		n.cmdLine.SetMessage(ERR_TOO_FEW_ARGS)
 		return nil
 	}
-	// TODO: This breaks consecutive spaces in a new value. This is because
+	// TODO: This merges multiple consecutive spaces into one. This is because
 	// commandline breaks along whitespace. A solution would be to either pass
 	// along the original command input (or just handle command parsing here
 	// instead of in command line), or alternatively allow wrapping command
