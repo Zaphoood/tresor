@@ -371,6 +371,47 @@ func (n *Navigate) decSearchIndex() tea.Cmd {
 	return cmd
 }
 
+func (n *Navigate) handleUndo() tea.Cmd {
+	result, err := n.undoman.Undo(n.database.Parsed())
+	if err != nil {
+		if _, ok := err.(undo.AtOldestChange); ok {
+			n.cmdLine.SetMessage(err.Error())
+		} else {
+			log.Println(err)
+		}
+		return nil
+	}
+
+	n.loadAllTables(false)
+
+	// An undoable action may ask for a tea.Cmd to be executed after it is undone, such as focusing a changed item
+	if cmd, ok := result.(tea.Cmd); ok {
+		return cmd
+	}
+
+	return nil
+}
+
+func (n *Navigate) handleRedo() tea.Cmd {
+	result, err := n.undoman.Redo(n.database.Parsed())
+	if err != nil {
+		if _, ok := err.(undo.AtNewestChange); ok {
+			n.cmdLine.SetMessage(err.Error())
+		} else {
+			log.Println(err)
+		}
+		return nil
+	}
+
+	n.loadAllTables(false)
+
+	if cmd, ok := result.(tea.Cmd); ok {
+		return cmd
+	}
+
+	return nil
+}
+
 func (n Navigate) Init() tea.Cmd {
 	return nil
 }
@@ -454,42 +495,18 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleKeyAnyFocus takes care of key events that should always be handled, except if the command line is active
+// All key handling functions return a boolean as their first return value which indicates wether the given key
+// event was handled by this function, in which case it should not be handled by other handler functions
 func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
 		n.cmdLine.SetMessage("Type  :q  and press <Enter> to exit tresor")
 		return true, nil
 	case "u":
-		// TODO: handle undo and redo in separate methods
-		result, err := n.undoman.Undo(n.database.Parsed())
-		if err != nil {
-			if _, ok := err.(undo.AtOldestChange); ok {
-				n.cmdLine.SetMessage(err.Error())
-			} else {
-				log.Println(err)
-			}
-			return true, nil
-		}
-		n.loadAllTables(false)
-		if cmd, ok := result.(tea.Cmd); ok {
-			return true, cmd
-		}
-		return true, nil
+		return true, n.handleUndo()
 	case "ctrl+r":
-		result, err := n.undoman.Redo(n.database.Parsed())
-		if err != nil {
-			if _, ok := err.(undo.AtNewestChange); ok {
-				n.cmdLine.SetMessage(err.Error())
-			} else {
-				log.Println(err)
-			}
-			return true, nil
-		}
-		n.loadAllTables(false)
-		if cmd, ok := result.(tea.Cmd); ok {
-			return true, cmd
-		}
-		return true, nil
+		return true, n.handleRedo()
 	}
 	return false, nil
 }
