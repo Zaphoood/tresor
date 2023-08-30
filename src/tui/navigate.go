@@ -339,12 +339,7 @@ func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	newEntry := focusedEntry
-	newEntry.UpdateField("Title", newValue)
-
-	return func() tea.Msg {
-		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, focusedEntry, focusChangedItemCmd(newEntry.UUID))}
-	}
+	return makeChangeFieldAction(focusedEntry, "Title", newValue, focusChangedItemCmd(focusedEntry.UUID))
 }
 
 func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {

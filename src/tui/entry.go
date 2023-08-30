@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -186,18 +187,18 @@ func (t *entryTable) deleteFocused() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry, focusChangedItemCmd(newEntry.UUID))}
+		return undoableActionMsg{undo.NewUpdateEntryAction(
+			newEntry,
+			t.entry,
+			focusChangedItemCmd(newEntry.UUID),
+			fmt.Sprintf("Delete '%s'", focusedKey),
+		)}
 	}
 }
 
 func (t *entryTable) changeFocused(newValue string) tea.Cmd {
 	focusedKey := t.fieldKeys[t.model.Cursor()]
-	newEntry := t.entry
-	newEntry.UpdateField(focusedKey, newValue)
-
-	return func() tea.Msg {
-		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry, focusChangedItemCmd(newEntry.UUID))}
-	}
+	return makeChangeFieldAction(t.entry, focusedKey, newValue, focusChangedItemCmd(t.entry.UUID))
 }
 
 // truncateHeader removes the header of a bubbles table by

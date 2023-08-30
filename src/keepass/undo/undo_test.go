@@ -68,7 +68,8 @@ func TestUpdateEntry(t *testing.T) {
 	newTitle := "foo"
 	newEntry.UpdateField("Title", newTitle)
 
-	result := u.Do(document, NewUpdateEntryAction(newEntry, entry, returnSentinel{}))
+	description := "Description"
+	result := u.Do(document, NewUpdateEntryAction(newEntry, entry, returnSentinel{}, description))
 	assert.Equal(result, returnSentinel{})
 
 	entry2 := assertGetEntry(document, path)

@@ -3,6 +3,7 @@ package undo
 type Action[T any] interface {
 	Do(*T) interface{}
 	Undo(*T) interface{}
+	Description() string
 }
 
 type AtOldestChange struct{}
