@@ -87,7 +87,7 @@ func (c *CommandLine) onEnter() tea.Cmd {
 	c.SetMessage(c.input.Prompt + c.input.Value())
 
 	if c.callback == nil {
-		log.Println("ERROR: No callback set in CommandLine.onEnter()")
+		log.Println("ERROR: In CommandLine.onEnter(): CommandLine.callback is nil")
 		return nil
 	}
 
