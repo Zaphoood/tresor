@@ -69,23 +69,26 @@ func TestUpdateEntry(t *testing.T) {
 	newEntry.UpdateField("Title", newTitle)
 
 	description := "Description"
-	result := u.Do(document, NewUpdateEntryAction(newEntry, entry, returnSentinel{}, description))
+	result, actualDescription := u.Do(document, NewUpdateEntryAction(newEntry, entry, returnSentinel{}, description))
 	assert.Equal(result, returnSentinel{})
+	assert.Equal(description, actualDescription)
 
 	entry2 := assertGetEntry(document, path)
 	assert.Equal(newTitle, entry2.TryGet("Title", "(Failed to get field"))
 
-	result, err = u.Undo(document)
+	result, actualDescription, err = u.Undo(document)
 	if assert.Nil(err) {
 		assert.Equal(result, returnSentinel{})
+		assert.Equal(description, actualDescription)
 	}
 
 	entry3 := assertGetEntry(document, path)
 	assert.Equal(originalTitle, entry3.TryGet("Title", "(Failed to get field"))
 
-	result, err = u.Redo(document)
+	result, actualDescription, err = u.Redo(document)
 	if assert.Nil(err) {
 		assert.Equal(result, returnSentinel{})
+		assert.Equal(description, actualDescription)
 	}
 
 	entry4 := assertGetEntry(document, path)

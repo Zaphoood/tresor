@@ -419,7 +419,7 @@ func (n *Navigate) decSearchIndex() tea.Cmd {
 }
 
 func (n *Navigate) handleUndo() tea.Cmd {
-	result, err := n.undoman.Undo(n.database.Parsed())
+	result, description, err := n.undoman.Undo(n.database.Parsed())
 	if err != nil {
 		if _, ok := err.(undo.AtOldestChange); ok {
 			n.cmdLine.SetMessage(err.Error())
@@ -429,6 +429,7 @@ func (n *Navigate) handleUndo() tea.Cmd {
 		return nil
 	}
 
+	n.cmdLine.SetMessage(fmt.Sprintf("Undo: %s", description))
 	n.loadAllTables()
 
 	// An undoable action may ask for a tea.Cmd to be executed after it is undone, such as focusing a changed item
@@ -440,7 +441,7 @@ func (n *Navigate) handleUndo() tea.Cmd {
 }
 
 func (n *Navigate) handleRedo() tea.Cmd {
-	result, err := n.undoman.Redo(n.database.Parsed())
+	result, description, err := n.undoman.Redo(n.database.Parsed())
 	if err != nil {
 		if _, ok := err.(undo.AtNewestChange); ok {
 			n.cmdLine.SetMessage(err.Error())
@@ -450,6 +451,7 @@ func (n *Navigate) handleRedo() tea.Cmd {
 		return nil
 	}
 
+	n.cmdLine.SetMessage(fmt.Sprintf("Redo: %s", description))
 	n.loadAllTables()
 
 	if cmd, ok := result.(tea.Cmd); ok {
@@ -490,7 +492,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case loadFailedMsg:
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
 	case undoableActionMsg:
-		result := n.undoman.Do(n.database.Parsed(), msg.action)
+		result, _ := n.undoman.Do(n.database.Parsed(), msg.action)
 		n.loadAllTables()
 		if cmd, ok := result.(tea.Cmd); ok {
 			return n, cmd

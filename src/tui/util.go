@@ -122,7 +122,7 @@ func makeChangeFieldAction(entry parser.Entry, field string, newValue string, re
 			newEntry,
 			entry,
 			focusChangedItemCmd(newEntry.UUID),
-			fmt.Sprintf("Change value of '%s' to '%s'", field, newValue),
+			fmt.Sprintf("Change '%s' to '%s'", field, newValue),
 		)}
 	}
 }

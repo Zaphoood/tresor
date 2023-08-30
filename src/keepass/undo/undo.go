@@ -30,25 +30,26 @@ func NewUndoManager[T any]() UndoManager[T] {
 		step:    0,
 	}
 }
-func (u *UndoManager[T]) Do(target *T, action Action[T]) interface{} {
+func (u *UndoManager[T]) Do(target *T, action Action[T]) (interface{}, string) {
 	u.actions = append(u.actions[:u.step], action)
 	u.step++
-	return action.Do(target)
+	return action.Do(target), action.Description()
 }
 
-func (u *UndoManager[T]) Undo(target *T) (interface{}, error) {
+func (u *UndoManager[T]) Undo(target *T) (interface{}, string, error) {
 	if u.step == 0 {
-		return nil, AtOldestChange{}
+		return nil, "", AtOldestChange{}
 	}
 	u.step--
-	return u.actions[u.step].Undo(target), nil
+	return u.actions[u.step].Undo(target), u.actions[u.step].Description(), nil
 }
 
-func (u *UndoManager[T]) Redo(target *T) (interface{}, error) {
+func (u *UndoManager[T]) Redo(target *T) (interface{}, string, error) {
 	if u.step >= len(u.actions) {
-		return nil, AtNewestChange{}
+		return nil, "", AtNewestChange{}
 	}
 	result := u.actions[u.step].Do(target)
+	description := u.actions[u.step].Description()
 	u.step++
-	return result, nil
+	return result, description, nil
 }
