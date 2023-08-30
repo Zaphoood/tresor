@@ -324,7 +324,7 @@ func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
 	}
 
 	if n.rightEntryTable.Focused() {
-		n.rightEntryTable.changeFocused(cmd[1])
+		return n.rightEntryTable.changeFocused(cmd[1])
 	} else {
 		log.Printf("Change active item of center table to '%s'", cmd[1])
 	}

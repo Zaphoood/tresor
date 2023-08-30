@@ -77,6 +77,7 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 			if r.Inner == "" {
 				value = ""
 			} else {
+				// TODO: consider showing a placeholder of the same length as the actual value
 				value = ENCRYPTED_PLACEH
 			}
 		} else {
@@ -195,7 +196,9 @@ func (t *entryTable) changeFocused(newValue string) tea.Cmd {
 	newEntry := t.entry
 	newEntry.UpdateField(focusedKey, newValue)
 
-	return nil
+	return func() tea.Msg {
+		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry, focusChangedItemCmd(newEntry.UUID))}
+	}
 }
 
 // truncateHeader removes the header of a bubbles table by
