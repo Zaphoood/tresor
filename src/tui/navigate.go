@@ -17,6 +17,8 @@ import (
 /* Model for navigating the Database in order to view and edit entries */
 
 const TABLE_SPACING = 1
+const ERR_TOO_FEW_ARGS = "Error: Too few arguments"
+const ERR_TOO_MANY_ARGS = "Error: Too many arguments"
 
 var tablePadding lipgloss.Style = lipgloss.NewStyle().PaddingRight(TABLE_SPACING)
 
@@ -263,6 +265,8 @@ func (n *Navigate) handleCommand(cmd []string) tea.Cmd {
 		return n.handleSaveCmd(cmd, true)
 	case "e":
 		return n.handleEditCmd(cmd)
+	case "change":
+		return n.handleChangeCmd(cmd)
 	default:
 		n.cmdLine.SetMessage(fmt.Sprintf("Not a command: %s", cmd[0]))
 		return nil
@@ -271,7 +275,7 @@ func (n *Navigate) handleCommand(cmd []string) tea.Cmd {
 
 func (n *Navigate) handleQuitCmd(cmd []string) tea.Cmd {
 	if len(cmd) > 1 && len(cmd[1]) > 1 {
-		n.cmdLine.SetMessage("Error: Too many arguments")
+		n.cmdLine.SetMessage(ERR_TOO_MANY_ARGS)
 		return nil
 	}
 	return func() tea.Msg { return clearClipboardAndQuitMsg{} }
@@ -279,7 +283,7 @@ func (n *Navigate) handleQuitCmd(cmd []string) tea.Cmd {
 
 func (n *Navigate) handleSaveCmd(cmd []string, quit bool) tea.Cmd {
 	if len(cmd) > 2 {
-		n.cmdLine.SetMessage("Error: Too many arguments")
+		n.cmdLine.SetMessage(ERR_TOO_MANY_ARGS)
 		return nil
 	}
 
@@ -298,7 +302,7 @@ func (n *Navigate) handleSaveCmd(cmd []string, quit bool) tea.Cmd {
 
 func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 	if len(cmd) > 2 {
-		n.cmdLine.SetMessage("Error: Too many arguments")
+		n.cmdLine.SetMessage(ERR_TOO_MANY_ARGS)
 		return nil
 	}
 	path := n.database.Path()
@@ -307,6 +311,25 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 	}
 	n.cmdLine.SetMessage("Reloading...")
 	return fileSelectedCmd(path)
+}
+
+func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
+	if len(cmd) < 1 {
+		n.cmdLine.SetMessage(ERR_TOO_FEW_ARGS)
+		return nil
+	}
+	if len(cmd) > 2 {
+		n.cmdLine.SetMessage(ERR_TOO_MANY_ARGS)
+		return nil
+	}
+
+	if n.rightEntryTable.Focused() {
+		n.rightEntryTable.changeFocused(cmd[1])
+	} else {
+		log.Printf("Change active item of center table to '%s'", cmd[1])
+	}
+
+	return nil
 }
 
 func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
@@ -548,6 +571,13 @@ func (n *Navigate) handleKeyCmdLineTrigger(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, n.cmdLine.StartInput(PROMPT_SEARCH, SearchCallback(false))
 	case PROMPT_REV_SEARCH:
 		return true, n.cmdLine.StartInput(PROMPT_REV_SEARCH, SearchCallback(true))
+	case "c":
+		// Note that we handle this keypress here even though it might seem
+		// like the right entry/group table should handle it. However, the
+		// selected item of the center table can also be changed, in addition,
+		// this does not actually change any items but only starts the command
+		// prompt. The actual change is then handled by the corresponding table.
+		return true, n.cmdLine.StartInputWithValue(PROMPT_COMMAND, CommandCallback, "change ")
 	}
 	return false, nil
 }

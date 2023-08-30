@@ -193,6 +193,11 @@ func (t *entryTable) deleteFocused() tea.Cmd {
 	}
 }
 
+func (t *entryTable) changeFocused(newValue string) tea.Cmd {
+	log.Printf("Entry %s: change focused to '%s'", t.entry.TryGet("Title", "()"), newValue)
+	return nil
+}
+
 // truncateHeader removes the header of a bubbles table by
 // deleting everything up to (and including) the first newline
 func truncateHeader(s string) string {

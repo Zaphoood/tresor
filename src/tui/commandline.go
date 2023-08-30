@@ -73,6 +73,7 @@ func (c *CommandLine) StartInput(prompt string, callback CmdLineInputCallback) t
 
 func (c *CommandLine) StartInputWithValue(prompt string, callback CmdLineInputCallback, initialValue string) tea.Cmd {
 	c.input.SetValue(initialValue)
+	// TODO: Fix: set cursor to length of inital value
 	c.callback = callback
 	c.input.Prompt = prompt
 	return c.input.Focus()
