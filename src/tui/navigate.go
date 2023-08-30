@@ -318,13 +318,15 @@ func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
 		n.cmdLine.SetMessage(ERR_TOO_FEW_ARGS)
 		return nil
 	}
-	if len(cmd) > 2 {
-		n.cmdLine.SetMessage(ERR_TOO_MANY_ARGS)
-		return nil
-	}
+	// TODO: This breaks consecutive spaces in a new value. This is because
+	// commandline breaks along whitespace. A solution would be to either pass
+	// along the original command input (or just handle command parsing here
+	// instead of in command line), or alternatively allow wrapping command
+	// arguments in parantheses
+	newValue := strings.Join(cmd[1:], " ")
 
 	if n.rightEntryTable.Focused() {
-		return n.rightEntryTable.changeFocused(cmd[1])
+		return n.rightEntryTable.changeFocused(newValue)
 	}
 
 	// If right table not focused an cursor is on an Entry, change that Entry's
@@ -338,7 +340,7 @@ func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
 		return nil
 	}
 	newEntry := focusedEntry
-	newEntry.UpdateField("Title", cmd[1])
+	newEntry.UpdateField("Title", newValue)
 
 	return func() tea.Msg {
 		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, focusedEntry, focusChangedItemCmd(newEntry.UUID))}
