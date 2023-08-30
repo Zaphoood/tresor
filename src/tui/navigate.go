@@ -21,12 +21,17 @@ const TABLE_SPACING = 1
 var tablePadding lipgloss.Style = lipgloss.NewStyle().PaddingRight(TABLE_SPACING)
 
 type Navigate struct {
-	parent       groupTable
-	selector     groupTable
-	groupPreview groupTable
-	entryPreview entryTable
-	lastCursors  map[string]string
-	cmdLine      CommandLine
+	// Shows the parent Group of the active Group (displayed by the center table)
+	leftTable groupTable
+	// Shows the active Group. This table's cursor can be controlled using j/k or up/down
+	centerTable groupTable
+	// Shows a preview of the currently selected item of the center table if it's a Group
+	rightGroupTable groupTable
+	// Same as above, but if the current item is an Entry
+	rightEntryTable entryTable
+	// Map the UUID of each group that has been visited to the UUID which was last hovered by the cursor
+	lastCursors map[string]string
+	cmdLine     CommandLine
 
 	search        []string
 	searchIndex   int
@@ -65,10 +70,10 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 		undoman:      undo.NewUndoManager[parser.Document](),
 	}
 	n.cmdLine = NewCommandLine()
-	n.parent = newGroupTable(tableStyles, true, false)
-	n.selector = newGroupTable(tableStyles, true, true, table.WithFocused(true))
-	n.groupPreview = newGroupTable(tableStyles, true, false)
-	n.entryPreview = newEntryTable(
+	n.leftTable = newGroupTable(tableStyles, true, false)
+	n.centerTable = newGroupTable(tableStyles, true, true, table.WithFocused(true))
+	n.rightGroupTable = newGroupTable(tableStyles, true, false)
+	n.rightEntryTable = newEntryTable(
 		tableStyles,
 		tableStylesBlurred,
 	)
@@ -85,30 +90,30 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 func (n *Navigate) resizeAll() {
 	totalWidth := n.windowWidth - 2*TABLE_SPACING
 	totalHeight := n.windowHeight - n.cmdLine.GetHeight()
-	selectorWidth := int(float64(totalWidth) * 0.3)
-	previewWidth := int(float64(totalWidth) * 0.5)
-	parentWidth := totalWidth - selectorWidth - previewWidth
+	centerTableWidth := int(float64(totalWidth) * 0.3)
+	rightTableWidth := int(float64(totalWidth) * 0.5)
+	leftTableWidth := totalWidth - centerTableWidth - rightTableWidth
 	height := totalHeight
 
-	n.parent.Resize(parentWidth, height)
-	n.selector.Resize(selectorWidth, height)
-	n.groupPreview.Resize(previewWidth, height)
-	n.entryPreview.Resize(previewWidth, height)
+	n.leftTable.Resize(leftTableWidth, height)
+	n.centerTable.Resize(centerTableWidth, height)
+	n.rightGroupTable.Resize(rightTableWidth, height)
+	n.rightEntryTable.Resize(rightTableWidth, height)
 }
 
 func (n *Navigate) loadAllTables() {
 	if len(n.path) == 0 {
-		n.parent.Clear()
+		n.leftTable.Clear()
 	} else {
-		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1])
-		err := n.parent.LoadLastCursor(&n.lastCursors)
+		n.leftTable.Load(n.database.Parsed(), n.path[:len(n.path)-1])
+		err := n.leftTable.LoadLastCursor(&n.lastCursors)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 
-	n.selector.Load(n.database.Parsed(), n.path)
-	err := n.selector.LoadLastCursor(&n.lastCursors)
+	n.centerTable.Load(n.database.Parsed(), n.path)
+	err := n.centerTable.LoadLastCursor(&n.lastCursors)
 	if err != nil {
 		log.Println(err)
 	}
@@ -126,13 +131,13 @@ func (n *Navigate) loadPreviewTable() {
 	}
 	switch focusedItem := (*focusedItem).(type) {
 	case parser.Group:
-		n.groupPreview.LoadGroup(focusedItem)
-		err := n.groupPreview.LoadLastCursor(&n.lastCursors)
+		n.rightGroupTable.LoadGroup(focusedItem)
+		err := n.rightGroupTable.LoadLastCursor(&n.lastCursors)
 		if err != nil {
 			log.Println(err)
 		}
 	case parser.Entry:
-		n.entryPreview.LoadEntry(focusedItem, n.database)
+		n.rightEntryTable.LoadEntry(focusedItem, n.database)
 	default:
 		log.Printf("ERROR in updatePreview: Expected Group or Entry as focused item")
 		return
@@ -156,16 +161,16 @@ func (n *Navigate) reopenLastGroup() {
 }
 
 func (n *Navigate) saveLastSelected() {
-	currentGroupUUID := n.parent.FocusedUUID()
+	currentGroupUUID := n.leftTable.FocusedUUID()
 	if len(currentGroupUUID) == 0 {
-		currentGroupUUID = n.selector.FocusedUUID()
+		currentGroupUUID = n.centerTable.FocusedUUID()
 	}
 	n.database.Parsed().Meta.LastSelectedGroup = currentGroupUUID
 }
 
 // getFocusedItem returns the currently focused database item if it exists, otherwise nil
 func (n *Navigate) getFocusedItem() *parser.Item {
-	focused := n.selector.FocusedUUID()
+	focused := n.centerTable.FocusedUUID()
 	if len(focused) == 0 {
 		return nil
 	}
@@ -202,7 +207,7 @@ func (n *Navigate) moveLeft() {
 }
 
 func (n *Navigate) moveRight() {
-	newPath := append(n.path, n.selector.FocusedUUID())
+	newPath := append(n.path, n.centerTable.FocusedUUID())
 	focusedItem, err := n.database.Parsed().GetItem(newPath)
 	if err != nil {
 		return
@@ -213,16 +218,16 @@ func (n *Navigate) moveRight() {
 		n.path = newPath
 		n.loadAllTables()
 	case parser.Entry:
-		n.selector.Blur()
-		n.entryPreview.Focus()
+		n.centerTable.Blur()
+		n.rightEntryTable.Focus()
 	}
 }
 
 // rememberCursor stores the currently focused UUID of the selector to table
 // which maps group UUIDs to the last selected item UUID
 func (n *Navigate) rememberCursor() {
-	if parentFocusedUUID := n.parent.FocusedUUID(); len(parentFocusedUUID) > 0 {
-		n.lastCursors[parentFocusedUUID] = n.selector.FocusedUUID()
+	if parentFocusedUUID := n.leftTable.FocusedUUID(); len(parentFocusedUUID) > 0 {
+		n.lastCursors[parentFocusedUUID] = n.centerTable.FocusedUUID()
 	}
 }
 
@@ -305,7 +310,7 @@ func (n *Navigate) handleEditCmd(cmd []string) tea.Cmd {
 }
 
 func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
-	n.search = n.selector.FindAll(func(item parser.Item) bool {
+	n.search = n.centerTable.FindAll(func(item parser.Item) bool {
 		switch item := item.(type) {
 		case parser.Group:
 			return strings.Contains(strings.ToLower(item.Name), strings.ToLower(query))
@@ -325,7 +330,7 @@ func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
 		n.searchIndex = 0
 	}
 
-	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	cmd, err := n.centerTable.SetCursorToUUID(n.search[n.searchIndex])
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -356,7 +361,7 @@ func (n *Navigate) incSearchIndex() tea.Cmd {
 	}
 	n.searchIndex = (n.searchIndex + 1) % len(n.search)
 
-	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	cmd, err := n.centerTable.SetCursorToUUID(n.search[n.searchIndex])
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -371,7 +376,7 @@ func (n *Navigate) decSearchIndex() tea.Cmd {
 	}
 	n.searchIndex = (n.searchIndex + len(n.search) - 1) % len(n.search)
 
-	cmd, err := n.selector.SetCursorToUUID(n.search[n.searchIndex])
+	cmd, err := n.centerTable.SetCursorToUUID(n.search[n.searchIndex])
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -458,8 +463,8 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return n, cmd
 		}
 	case leaveEntryEditor:
-		n.selector.Focus()
-		n.entryPreview.Blur()
+		n.centerTable.Focus()
+		n.rightEntryTable.Blur()
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height
@@ -484,11 +489,11 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if n.cmdLine.Focused() {
 		n.cmdLine, cmd = n.cmdLine.Update(msg)
 		return n, cmd
-	} else if n.entryPreview.Focused() {
-		n.entryPreview, cmd = n.entryPreview.Update(msg)
+	} else if n.rightEntryTable.Focused() {
+		n.rightEntryTable, cmd = n.rightEntryTable.Update(msg)
 		return n, cmd
 	} else {
-		n.selector, cmd = n.selector.Update(msg)
+		n.centerTable, cmd = n.centerTable.Update(msg)
 		n.rememberCursor()
 		return n, cmd
 	}
@@ -512,7 +517,7 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 // handleKeyDefault handles key events when no other components are focused (such as command line, entry preview)
 func (n *Navigate) handleKeyDefault(msg tea.KeyMsg) (bool, tea.Cmd) {
-	if n.entryPreview.Focused() {
+	if n.rightEntryTable.Focused() {
 		return false, nil
 	}
 
@@ -555,15 +560,15 @@ func (n Navigate) View() string {
 	} else {
 		switch (*focusedItem).(type) {
 		case parser.Group:
-			preview = n.groupPreview.View()
+			preview = n.rightGroupTable.View()
 		case parser.Entry:
-			preview = n.entryPreview.View()
+			preview = n.rightEntryTable.View()
 		}
 	}
 	tables := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		tablePadding.Render(n.parent.View()),
-		tablePadding.Render(n.selector.View()),
+		tablePadding.Render(n.leftTable.View()),
+		tablePadding.Render(n.centerTable.View()),
 		preview,
 	)
 	return lipgloss.JoinVertical(lipgloss.Left, tables, n.cmdLine.View())

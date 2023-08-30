@@ -148,9 +148,8 @@ func (t *entryTable) Focused() bool {
 
 // copyFocusedToClipboard copies the value of the currently focused field to the clipboard
 func (t *entryTable) copyFocusedToClipboard() tea.Cmd {
-	// We have to get the key by indexing the table rows,
-	// since the display order of strings may be different
-	// from the order in t.entry.Strings
+	// We have to get the key by indexing the table rows, since the display
+	// order of strings may be different from the order in t.entry.Strings
 	// TODO: This is a bit hacky, maybe find a less confusing solution
 	key := t.fieldKeys[t.model.Cursor()]
 	value, err := t.entry.Get(key)
