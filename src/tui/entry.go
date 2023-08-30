@@ -12,7 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const ENCRYPTED_PLACEH = "••••••"
+const ENCRYPTED_PLACEH = "•"
 
 var defaultEntryFields []entryField = []entryField{
 	{"Title", "Title", NO_TITLE_PLACEHOLDER},
@@ -77,8 +77,7 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 			if r.Inner == "" {
 				value = ""
 			} else {
-				// TODO: consider showing a placeholder of the same length as the actual value
-				value = ENCRYPTED_PLACEH
+				value = strings.Repeat(ENCRYPTED_PLACEH, len(r.Inner))
 			}
 		} else {
 			value = r.Inner
@@ -95,7 +94,7 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 			if field.Value.Inner == "" {
 				value = ""
 			} else {
-				value = ENCRYPTED_PLACEH
+				value = strings.Repeat(ENCRYPTED_PLACEH, len(field.Value.Inner))
 			}
 		} else {
 			value = field.Value.Inner
