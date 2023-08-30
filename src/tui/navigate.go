@@ -75,7 +75,7 @@ func NewNavigate(database *database.Database, windowWidth, windowHeight int) Nav
 
 	n.resizeAll()
 	n.reopenLastGroup()
-	n.loadAllTables(true)
+	n.loadAllTables()
 
 	initClipboard()
 
@@ -96,34 +96,30 @@ func (n *Navigate) resizeAll() {
 	n.entryPreview.Resize(previewWidth, height)
 }
 
-func (n *Navigate) loadAllTables(updateCursor bool) {
+func (n *Navigate) loadAllTables() {
 	if len(n.path) == 0 {
 		n.parent.Clear()
 	} else {
 		n.parent.Load(n.database.Parsed(), n.path[:len(n.path)-1])
-		if updateCursor {
-			err := n.parent.LoadLastCursor(&n.lastCursors)
-			if err != nil {
-				log.Println(err)
-			}
-		}
-	}
-
-	n.selector.Load(n.database.Parsed(), n.path)
-	if updateCursor {
-		err := n.selector.LoadLastCursor(&n.lastCursors)
+		err := n.parent.LoadLastCursor(&n.lastCursors)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 
-	n.loadPreviewTable(updateCursor)
+	n.selector.Load(n.database.Parsed(), n.path)
+	err := n.selector.LoadLastCursor(&n.lastCursors)
+	if err != nil {
+		log.Println(err)
+	}
+
+	n.loadPreviewTable()
 
 	// Reset search results
 	n.search = []string{}
 }
 
-func (n *Navigate) loadPreviewTable(updateCursor bool) {
+func (n *Navigate) loadPreviewTable() {
 	focusedItem := n.getFocusedItem()
 	if focusedItem == nil {
 		return
@@ -131,9 +127,6 @@ func (n *Navigate) loadPreviewTable(updateCursor bool) {
 	switch focusedItem := (*focusedItem).(type) {
 	case parser.Group:
 		n.groupPreview.LoadGroup(focusedItem)
-		if !updateCursor {
-			return
-		}
 		err := n.groupPreview.LoadLastCursor(&n.lastCursors)
 		if err != nil {
 			log.Println(err)
@@ -188,9 +181,8 @@ func (n *Navigate) moveLeft() {
 	if len(n.path) == 0 {
 		return
 	}
-	n.rememberCursor()
 	n.path = n.path[:len(n.path)-1]
-	n.loadAllTables(true)
+	n.loadAllTables()
 }
 
 func (n *Navigate) moveRight() {
@@ -202,15 +194,16 @@ func (n *Navigate) moveRight() {
 
 	switch focusedItem.(type) {
 	case parser.Group:
-		n.rememberCursor()
 		n.path = newPath
-		n.loadAllTables(true)
+		n.loadAllTables()
 	case parser.Entry:
 		n.selector.Blur()
 		n.entryPreview.Focus()
 	}
 }
 
+// rememberCursor stores the currently focused UUID of the selector to table
+// which maps group UUIDs to the last selected item UUID
 func (n *Navigate) rememberCursor() {
 	if parentFocusedUUID := n.parent.FocusedUUID(); len(parentFocusedUUID) > 0 {
 		n.lastCursors[parentFocusedUUID] = n.selector.FocusedUUID()
@@ -382,7 +375,7 @@ func (n *Navigate) handleUndo() tea.Cmd {
 		return nil
 	}
 
-	n.loadAllTables(false)
+	n.loadAllTables()
 
 	// An undoable action may ask for a tea.Cmd to be executed after it is undone, such as focusing a changed item
 	if cmd, ok := result.(tea.Cmd); ok {
@@ -403,7 +396,7 @@ func (n *Navigate) handleRedo() tea.Cmd {
 		return nil
 	}
 
-	n.loadAllTables(false)
+	n.loadAllTables()
 
 	if cmd, ok := result.(tea.Cmd); ok {
 		return cmd
@@ -425,19 +418,20 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		clearClipboard()
 		return n, tea.Quit
 	case groupTableCursorChanged:
-		n.loadPreviewTable(true)
+		n.loadPreviewTable()
 	case focusItemMsg:
 		path, found := n.database.Parsed().FindPath(msg.uuid)
 		if !found {
 			log.Printf("ERROR: Cannot focus on item '%s' (not found)", msg.uuid)
 		}
 		if len(path) > 0 {
-			n.path = path[:len(path)-1]
-			n.loadAllTables(false)
-			cmd, err := n.selector.SetCursorToUUID(msg.uuid)
-			if err != nil {
-				log.Println(err)
+			for i := 0; i < len(path)-1; i++ {
+				n.lastCursors[path[i]] = path[i+1]
 			}
+			// Omit last item of path, which is the UUID of the item to be focused. This is because
+			// the path relates to the group shown in selector, not to its selected item
+			n.path = path[:len(path)-1]
+			n.loadAllTables()
 			return n, cmd
 		}
 	case commandInputMsg:
@@ -455,7 +449,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		n.cmdLine.SetMessage(fmt.Sprintf("Error while loading: %s", msg.err))
 	case undoableActionMsg:
 		result := n.undoman.Do(n.database.Parsed(), msg.action)
-		n.loadAllTables(false)
+		n.loadAllTables()
 		if cmd, ok := result.(tea.Cmd); ok {
 			return n, cmd
 		}
@@ -491,6 +485,7 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return n, cmd
 	} else {
 		n.selector, cmd = n.selector.Update(msg)
+		n.rememberCursor()
 		return n, cmd
 	}
 }
