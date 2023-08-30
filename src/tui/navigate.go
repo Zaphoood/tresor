@@ -325,11 +325,24 @@ func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
 
 	if n.rightEntryTable.Focused() {
 		return n.rightEntryTable.changeFocused(cmd[1])
-	} else {
-		log.Printf("Change active item of center table to '%s'", cmd[1])
 	}
 
-	return nil
+	// If right table not focused an cursor is on an Entry, change that Entry's
+	// title
+	focusedItem := n.getFocusedItem()
+	if focusedItem == nil {
+		return nil
+	}
+	focusedEntry, ok := (*focusedItem).(parser.Entry)
+	if !ok {
+		return nil
+	}
+	newEntry := focusedEntry
+	newEntry.UpdateField("Title", cmd[1])
+
+	return func() tea.Msg {
+		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, focusedEntry, focusChangedItemCmd(newEntry.UUID))}
+	}
 }
 
 func (n *Navigate) handleSearch(query string, reverse bool) tea.Cmd {
