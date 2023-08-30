@@ -185,16 +185,16 @@ func (t *entryTable) deleteFocused() tea.Cmd {
 		t.model.SetCursor(len(newEntry.Strings) - 1)
 	}
 
-	var focusChangedItem tea.Cmd = func() tea.Msg {
-		return focusItemMsg{newEntry.UUID}
-	}
 	return func() tea.Msg {
-		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry, focusChangedItem)}
+		return undoableActionMsg{undo.NewUpdateEntryAction(newEntry, t.entry, focusChangedItemCmd(newEntry.UUID))}
 	}
 }
 
 func (t *entryTable) changeFocused(newValue string) tea.Cmd {
-	log.Printf("Entry %s: change focused to '%s'", t.entry.TryGet("Title", "()"), newValue)
+	focusedKey := t.fieldKeys[t.model.Cursor()]
+	newEntry := t.entry
+	newEntry.UpdateField(focusedKey, newValue)
+
 	return nil
 }
 
@@ -206,4 +206,10 @@ func truncateHeader(s string) string {
 		return split[0]
 	}
 	return split[1]
+}
+
+func focusChangedItemCmd(uuid string) tea.Cmd {
+	return func() tea.Msg {
+		return focusItemMsg{uuid}
+	}
 }
