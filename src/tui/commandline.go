@@ -68,7 +68,11 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 }
 
 func (c *CommandLine) StartInput(prompt string, callback CmdLineInputCallback) tea.Cmd {
-	c.input.SetValue("")
+	return c.StartInputWithValue(prompt, callback, "")
+}
+
+func (c *CommandLine) StartInputWithValue(prompt string, callback CmdLineInputCallback, initialValue string) tea.Cmd {
+	c.input.SetValue(initialValue)
 	c.callback = callback
 	c.input.Prompt = prompt
 	return c.input.Focus()
