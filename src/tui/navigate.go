@@ -177,6 +177,22 @@ func (n *Navigate) getFocusedItem() *parser.Item {
 	return &item
 }
 
+func (n *Navigate) focusItem(uuid string) {
+	path, found := n.database.Parsed().FindPath(uuid)
+	if !found {
+		log.Printf("ERROR: Cannot focus on item '%s' (not found)", uuid)
+	}
+	if len(path) > 0 {
+		for i := 0; i < len(path)-1; i++ {
+			n.lastCursors[path[i]] = path[i+1]
+		}
+		// Omit last item of path, which is the UUID of the item to be focused. This is because
+		// the path relates to the group shown in selector, not to its selected item
+		n.path = path[:len(path)-1]
+		n.loadAllTables()
+	}
+}
+
 func (n *Navigate) moveLeft() {
 	if len(n.path) == 0 {
 		return
@@ -420,20 +436,8 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case groupTableCursorChanged:
 		n.loadPreviewTable()
 	case focusItemMsg:
-		path, found := n.database.Parsed().FindPath(msg.uuid)
-		if !found {
-			log.Printf("ERROR: Cannot focus on item '%s' (not found)", msg.uuid)
-		}
-		if len(path) > 0 {
-			for i := 0; i < len(path)-1; i++ {
-				n.lastCursors[path[i]] = path[i+1]
-			}
-			// Omit last item of path, which is the UUID of the item to be focused. This is because
-			// the path relates to the group shown in selector, not to its selected item
-			n.path = path[:len(path)-1]
-			n.loadAllTables()
-			return n, cmd
-		}
+		n.focusItem(msg.uuid)
+		return n, nil
 	case commandInputMsg:
 		cmd = n.handleCommand(msg.cmd)
 		return n, cmd
