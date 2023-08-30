@@ -113,6 +113,7 @@ func (t entryTable) Update(msg tea.Msg) (entryTable, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.String() {
+		// TODO: Why is this handled here? We can handle this in Navigate just as well
 		case "h", "esc":
 			return t, func() tea.Msg { return leaveEntryEditor{} }
 		case "y":

@@ -481,6 +481,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if handled, cmd := n.handleKeyCmdLineTrigger(msg); handled {
 			return n, cmd
 		}
+
+		if n.rightEntryTable.Focused() {
+			break
+		}
 		if handled, cmd := n.handleKeyDefault(msg); handled {
 			return n, cmd
 		}
@@ -517,10 +521,6 @@ func (n *Navigate) handleKeyAnyFocus(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 // handleKeyDefault handles key events when no other components are focused (such as command line, entry preview)
 func (n *Navigate) handleKeyDefault(msg tea.KeyMsg) (bool, tea.Cmd) {
-	if n.rightEntryTable.Focused() {
-		return false, nil
-	}
-
 	switch msg.String() {
 	case "y":
 		return true, n.copyToClipboard()
