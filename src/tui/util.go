@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -100,4 +101,11 @@ func joinRetainTrailingSep(elem ...string) string {
 		return joined + string(filepath.Separator)
 	}
 	return joined
+}
+
+//tableFocusCursor makes sure that cursor of a table.Model is visible
+func tableFocusCursor(t *table.Model) {
+	// This shitty workaround is necessary, since when the cursor is set using t.SetCursor(), it may go off screen
+	t.MoveUp(0)
+	t.MoveDown(0)
 }
