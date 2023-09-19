@@ -500,6 +500,10 @@ func (n Navigate) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case leaveEntryEditor:
 		n.centerTable.Focus()
 		n.rightEntryTable.Blur()
+	case setCommandLineMessageMsg:
+		// TODO: Consider calling it the command line's 'status' instead in order to avoid these unfortunate variable names
+		n.cmdLine.SetMessage(msg.msg)
+		return n, nil
 	case tea.WindowSizeMsg:
 		n.windowWidth = msg.Width
 		n.windowHeight = msg.Height

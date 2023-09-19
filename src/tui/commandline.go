@@ -43,10 +43,6 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case setCommandLineMessageMsg:
-		// TODO: Consider calling it the command line's 'status' instead in order to avoid these unfortunate variable names
-		c.SetMessage(msg.msg)
-		return c, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc", "ctrl+c":
