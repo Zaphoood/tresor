@@ -215,6 +215,7 @@ func (t *groupTable) SetCursorToUUID(uuid string) (tea.Cmd, error) {
 				return nil, nil
 			}
 			t.model.SetCursor(i)
+			tableFocusCursor(&t.model)
 			return func() tea.Msg { return groupTableCursorChanged{} }, nil
 		}
 	}
