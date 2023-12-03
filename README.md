@@ -1,6 +1,6 @@
 # Tresor 🗝️
 
-A [KeePass](https://keepass.info/) TUI written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Bubbles](https://github.com/charmbracelet/bubbles), featuring a [ranger](https://github.com/ranger/ranger)-inspired layout and vi-like keybindings.
+Tresor (pronounced [tʁeˈzoːɐ̯] or any way you like) is a [KeePass](https://keepass.info/) TUI written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Bubbles](https://github.com/charmbracelet/bubbles), featuring a [ranger](https://github.com/ranger/ranger)-inspired layout and vi-like keybindings.
 
 <p align="center">
   <br>
