@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zaphoood/tresor/src/keepass/parser/wrappers"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,25 +16,31 @@ const (
 	PROTECTED_STREAM_KEY = "be3723cc9496ac62a51976df67314e68203140178c1aba143ce6c2441f1068f4"
 )
 
-func TestParse(t *testing.T) {
-	assert := assert.New(t)
-
+func parseDecryptedExample(t *testing.T) *Document {
 	key, err := hex.DecodeString(PROTECTED_STREAM_KEY)
 	if err != nil || len(key) != 32 {
 		t.Fatal("Failed to decode hex string")
 	}
 	xmlFile, err := os.Open("../test/example_decrypted.xml")
 	defer xmlFile.Close()
-	if !assert.Nil(err) {
-		return
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	byteValue, _ := ioutil.ReadAll(xmlFile)
+	content, _ := ioutil.ReadAll(xmlFile)
 
-	parsed, err := Parse(byteValue, *(*[32]byte)(key))
-	if !assert.Nil(err) {
-		return
+	parsed, err := Parse(content, *(*[32]byte)(key))
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	return parsed
+}
+
+func TestParse(t *testing.T) {
+	assert := assert.New(t)
+
+	parsed := parseDecryptedExample(t)
 
 	assert.Equal(GENERATOR, parsed.Meta.Generator)
 	// We know that the first entry in the database has password "Password"
@@ -109,4 +116,46 @@ func TestParse(t *testing.T) {
 	if assert.True(ok) {
 		assert.Equal(entry.UUID, path[len(path)-1])
 	}
+}
+
+func TestUpdateEntry(t *testing.T) {
+	assert := assert.New(t)
+
+	document := parseDecryptedExample(t)
+
+	path := []string{"M0Gbdz4OmEaVH1j8pqgWFA==", "A/ntiXf2VEW3qSstTnhbcA=="}
+	item, err := document.GetItem(path)
+	if !assert.Nil(err) {
+		return
+	}
+	entry, ok := item.(Entry)
+	assert.True(ok, "Test entry is not of type Entry")
+
+	newEntry := entry
+	newEntry.Strings = []String{
+		{
+			Key: "foo", Value: wrappers.Value{
+				Inner:     "bar",
+				Protected: false,
+			},
+		},
+	}
+	document.UpdateEntry(newEntry)
+
+	retrievedItem, err := document.GetItem(path)
+	if !assert.Nil(err) {
+		return
+	}
+
+	retrievedEntry, ok := retrievedItem.(Entry)
+	assert.True(ok, "Retrieved entry is not of type Entry")
+
+	assert.Equal(entry.UUID, retrievedEntry.UUID)
+	assert.Equal(entry.IconID, retrievedEntry.IconID)
+	assert.Equal(entry.BinaryRefs, retrievedEntry.BinaryRefs)
+	assert.Equal(entry.History, retrievedEntry.History)
+
+	assert.Equal(1, len(retrievedEntry.Strings))
+	assert.Equal("foo", retrievedEntry.Strings[0].Key)
+	assert.Equal("bar", retrievedEntry.Strings[0].Value.Inner)
 }

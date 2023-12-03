@@ -9,6 +9,8 @@ import (
 
 	"github.com/Zaphoood/tresor/src/keepass/crypto"
 	"github.com/Zaphoood/tresor/src/keepass/database"
+	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/keepass/undo"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -140,4 +142,12 @@ type leaveEntryEditor struct{}
 
 type setCommandLineMessageMsg struct {
 	msg string
+}
+
+type undoableActionMsg struct {
+	action undo.Action[parser.Document]
+}
+
+type focusItemMsg struct {
+	uuid string
 }

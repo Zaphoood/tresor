@@ -43,10 +43,6 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case setCommandLineMessageMsg:
-		// TODO: Consider calling it the command line's 'status' instead in order to avoid these unfortunate variable names
-		c.SetMessage(msg.msg)
-		return c, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc", "ctrl+c":
@@ -68,7 +64,12 @@ func (c CommandLine) Update(msg tea.Msg) (CommandLine, tea.Cmd) {
 }
 
 func (c *CommandLine) StartInput(prompt string, callback CmdLineInputCallback) tea.Cmd {
-	c.input.SetValue("")
+	return c.StartInputWithValue(prompt, callback, "")
+}
+
+func (c *CommandLine) StartInputWithValue(prompt string, callback CmdLineInputCallback, initialValue string) tea.Cmd {
+	c.input.SetValue(initialValue)
+	c.input.SetCursor(len(initialValue))
 	c.callback = callback
 	c.input.Prompt = prompt
 	return c.input.Focus()
@@ -87,7 +88,7 @@ func (c *CommandLine) onEnter() tea.Cmd {
 	c.SetMessage(c.input.Prompt + c.input.Value())
 
 	if c.callback == nil {
-		log.Println("ERROR: No callback set in CommandLine.onEnter()")
+		log.Println("ERROR: In CommandLine.onEnter(): CommandLine.callback is nil")
 		return nil
 	}
 

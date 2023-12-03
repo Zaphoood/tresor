@@ -1,21 +1,33 @@
 package tui
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
 	"github.com/Zaphoood/tresor/src/keepass/database"
 	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/keepass/undo"
+	"github.com/Zaphoood/tresor/src/util/set"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const ENCRYPTED_PLACEH = "••••••"
+const ENCRYPTED_PLACEH = "•"
 
 var defaultEntryFields []entryField = []entryField{
-	{"Title", "Title", TITLE_PLACEH},
+	{"Title", "Title", NO_TITLE_PLACEHOLDER},
 	{"UserName", "Username", ""},
 	{"Password", "Password", ""},
+}
+
+func isDefaultEntryField(key string) bool {
+	for _, field := range defaultEntryFields {
+		if field.key == key {
+			return true
+		}
+	}
+	return false
 }
 
 type entryTable struct {
@@ -55,27 +67,36 @@ func (t *entryTable) LoadEntry(entry parser.Entry, d *database.Database) {
 	t.entry = entry
 	t.fieldKeys = make([]string, 0, len(entry.Strings))
 	rows := make([]table.Row, 0, len(entry.Strings))
-	visited := make(map[string]struct{})
+	visited := set.New[string]()
+
 	var value string
 	for _, field := range defaultEntryFields {
 		r, err := entry.Get(field.key)
 		if err != nil {
 			value = field.defaultValue
 		} else if r.Protected {
-			value = ENCRYPTED_PLACEH
+			if r.Inner == "" {
+				value = ""
+			} else {
+				value = strings.Repeat(ENCRYPTED_PLACEH, len(r.Inner))
+			}
 		} else {
 			value = r.Inner
 		}
 		rows = append(rows, table.Row{field.displayName, value})
 		t.fieldKeys = append(t.fieldKeys, field.key)
-		visited[field.key] = struct{}{}
+		visited.Insert(field.key)
 	}
 	for _, field := range entry.Strings {
-		if _, skip := visited[field.Key]; skip {
+		if visited.Contains(field.Key) {
 			continue
 		}
 		if field.Value.Protected {
-			value = ENCRYPTED_PLACEH
+			if field.Value.Inner == "" {
+				value = ""
+			} else {
+				value = strings.Repeat(ENCRYPTED_PLACEH, len(field.Value.Inner))
+			}
 		} else {
 			value = field.Value.Inner
 		}
@@ -93,10 +114,14 @@ func (t entryTable) Update(msg tea.Msg) (entryTable, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.String() {
+		// TODO: Why is this handled here? We can handle this in Navigate just as well
 		case "h", "esc":
 			return t, func() tea.Msg { return leaveEntryEditor{} }
 		case "y":
-			cmd = t.copyToClipboard()
+			cmd = t.copyFocusedToClipboard()
+			return t, cmd
+		case "d":
+			cmd = t.deleteFocused()
 			return t, cmd
 		}
 	}
@@ -123,11 +148,10 @@ func (t *entryTable) Focused() bool {
 	return t.model.Focused()
 }
 
-// copyToClipboard copies the value of the currently focused field to the clipboard
-func (t *entryTable) copyToClipboard() tea.Cmd {
-	// We have to get the key by indexing the table rows,
-	// since the display order of strings may be different
-	// from the order in t.entry.Strings
+// copyFocusedToClipboard copies the value of the currently focused field to the clipboard
+func (t *entryTable) copyFocusedToClipboard() tea.Cmd {
+	// We have to get the key by indexing the table rows, since the display
+	// order of strings may be different from the order in t.entry.Strings
 	// TODO: This is a bit hacky, maybe find a less confusing solution
 	key := t.fieldKeys[t.model.Cursor()]
 	value, err := t.entry.Get(key)
@@ -136,13 +160,45 @@ func (t *entryTable) copyToClipboard() tea.Cmd {
 		return nil
 	}
 
-	// TODO: Set status message
-
 	clipboardDelay := 0
 	if value.Protected {
 		clipboardDelay = CLEAR_CLIPBOARD_DELAY
 	}
 	return copyToClipboard(value.Inner, clipboardDelay)
+}
+
+func (t *entryTable) deleteFocused() tea.Cmd {
+	focusedKey := t.fieldKeys[t.model.Cursor()]
+	newEntry := t.entry
+	if isDefaultEntryField(focusedKey) {
+		changed := newEntry.UpdateField(focusedKey, "")
+		if !changed {
+			return nil
+		}
+	} else {
+		changed := newEntry.DeleteField(focusedKey)
+		if !changed {
+			log.Printf("ERROR: Tried to delete field '%s' from entry '%s' but no change made\n", focusedKey, t.entry.UUID)
+		}
+	}
+
+	if t.model.Cursor() >= len(newEntry.Strings) {
+		t.model.SetCursor(len(newEntry.Strings) - 1)
+	}
+
+	return func() tea.Msg {
+		return undoableActionMsg{undo.NewUpdateEntryAction(
+			newEntry,
+			t.entry,
+			focusChangedItemCmd(newEntry.UUID),
+			fmt.Sprintf("Delete '%s'", focusedKey),
+		)}
+	}
+}
+
+func (t *entryTable) changeFocused(newValue string) tea.Cmd {
+	focusedKey := t.fieldKeys[t.model.Cursor()]
+	return makeChangeFieldAction(t.entry, focusedKey, newValue, focusChangedItemCmd(t.entry.UUID))
 }
 
 // truncateHeader removes the header of a bubbles table by
@@ -153,4 +209,10 @@ func truncateHeader(s string) string {
 		return split[0]
 	}
 	return split[1]
+}
+
+func focusChangedItemCmd(uuid string) tea.Cmd {
+	return func() tea.Msg {
+		return focusItemMsg{uuid}
+	}
 }

@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Zaphoood/tresor/src/keepass/parser"
+	"github.com/Zaphoood/tresor/src/keepass/undo"
 	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -108,4 +111,18 @@ func tableFocusCursor(t *table.Model) {
 	// This shitty workaround is necessary, since when the cursor is set using t.SetCursor(), it may go off screen
 	t.MoveUp(0)
 	t.MoveDown(0)
+}
+
+func makeChangeFieldAction(entry parser.Entry, field string, newValue string, returnValue interface{}) tea.Cmd {
+	newEntry := entry
+	newEntry.UpdateField(field, newValue)
+
+	return func() tea.Msg {
+		return undoableActionMsg{undo.NewUpdateEntryAction(
+			newEntry,
+			entry,
+			focusChangedItemCmd(newEntry.UUID),
+			fmt.Sprintf("Change '%s' to '%s'", field, newValue),
+		)}
+	}
 }
