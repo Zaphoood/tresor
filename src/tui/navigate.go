@@ -337,7 +337,7 @@ func (n *Navigate) handleChangeCmd(cmd []string) tea.Cmd {
 	}
 	focusedEntry, ok := (*focusedItem).(parser.Entry)
 	if !ok {
-		return nil
+		return func() tea.Msg { return setCommandLineMessageMsg{"Sorry, only entries can be renamed"} }
 	}
 	return makeChangeFieldAction(focusedEntry, "Title", newValue, focusChangedItemCmd(focusedEntry.UUID))
 }
