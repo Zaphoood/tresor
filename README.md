@@ -1,5 +1,7 @@
 # Tresor 🗝️
 
+| This project is no longer actively maintained.
+
 Tresor (pronounced [tʁeˈzoːɐ̯] &mdash; or any way you like) is a [KeePass](https://keepass.info/) TUI written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Bubbles](https://github.com/charmbracelet/bubbles), featuring a [ranger](https://github.com/ranger/ranger)-inspired layout and vi-like keybindings.
 
 <p align="center">
@@ -86,31 +88,3 @@ These commands are currently available:
 | `:change <new-value>` | Set value of focused entry / field to `<new-value>` (shortcut: `c`)     |
 
 Note that currently, the `:w` command is pretty much useless, since editing entries is not supported, so it's not possible to actually make changes to a file. However, the last selected group is, in fact, stored and remembered when re-opening.
-
-## Roadmap
-
-This project is at an early stage. Here is the list of what's possible right now:
-
-- Load and save `.kdbx` files of version 3.1
-- Navigate groups and entries
-- Preview entries
-- Copy passwords to clipboard
-- Editing entries (kind of)
-
-Some features planned for the future are:
-
-- Fuzzy-finding
-- Creating new databases
-- Customization via config file (inculding color scheme)
-- Kdbx version 4 support
-- Auto-type
-- WebDAV integration (and possibly other file sharing protocols)
-
-The main goal is to implement all the core features provided by [KeePass](https://keepass.info/).
-
-Note that currently, only Linux is actively supported, but the code should compile on Windows and macOS as well. Try it out &mdash; it might just work ;)
-
-## Contributing
-
-If you find any bugs or have a feature request, please file an issue.
-Pull requests are also welcome :)
