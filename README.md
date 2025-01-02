@@ -70,7 +70,7 @@ To undo any change, press `u`. To redo, press `C-r`.
 ### Searching
 
 To search through the current group, type `/` (or `?` for backward search) followed by a query, and press `Enter`.
-Cycle through matches using `n` and `N` for the next and last result, respectively.
+Cycle through matches using `n` and `N` for the next and previous match, respectively.
 
 ### Commands
 
